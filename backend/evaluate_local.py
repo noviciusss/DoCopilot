@@ -8,7 +8,7 @@ dotenv.load_dotenv(dotenv.find_dotenv())
 from rag import index_get_pdf, ask_question
 
 # Rate limit: wait between requests to avoid 429 errors
-RATE_LIMIT_DELAY = 1  # seconds between requests (Gemini free tier: 10/min)
+RATE_LIMIT_DELAY = 5  # seconds between requests (Gemini free tier: 10/min)
 
 
 def load_questions(jsonl_path: str) -> list[dict]:

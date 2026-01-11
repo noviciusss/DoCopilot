@@ -30,8 +30,9 @@ if os.getenv("LANGCHAIN_API_KEY"):
     langsmith_client = Client()
     logger.info("Langsmith client initialized")
 
-chunk_size = 2000
-chunk_overlap = 400
+##Trying diffrent text splitter settings 1- 2000/400 2-1000/200 3-500/100
+chunk_size = 500
+chunk_overlap = 100
 
 splitter = RecursiveCharacterTextSplitter(
     chunk_size=chunk_size,
