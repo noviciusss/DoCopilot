@@ -20,6 +20,8 @@ from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from langchain_groq import ChatGroq
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -150,7 +152,7 @@ def get_vector_store(document_id: Optional[str] = None) -> FAISS:
 
 @traceable(
     name="ask_question",
-    metadata={"version": "1.0", "model": "gemini-2.5-flash-lite"},
+    metadata={"version": "1.0", "model": "gpt-oss-120b"},
     tags=["rag", "qa"]
 )
 def ask_question(question: str, *, document_id: Optional[str] = None, k: int = 5) -> tuple[str, list[str]]:
@@ -187,7 +189,7 @@ Answer (bullets):
         input_variables=["context", "question"],
     )
     final_prompt = prompt.format(context=context, question=question)
-    llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash-lite', temperature=0)
+    llm = ChatGroq(model="openai/gpt-oss-120b", temperature=1)
     response = llm.invoke(final_prompt)
 
     answer = getattr(response, "text", None) or getattr(response, "content", str(response))
