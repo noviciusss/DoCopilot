@@ -41,28 +41,81 @@ The UI calls the backend at `http://localhost:8000` by default. Override with `N
 
 ## RAG Evaluation Results
 
-Evaluated on **40 Q&A pairs** from the AWS Overview whitepaper using a basic RAG pipeline:
+Evaluated on **40 Q&A pairs** from the AWS Overview whitepaper.
 
-| Metric | Score | Notes |
-|--------|-------|-------|
-| **Success Rate** | 100% | All questions answered without errors |
-| **Correctness** | 50.3% | Keyword overlap with expected answers |
-| **Relevance** | 37.2% | Question-answer alignment score |
-| **Source Citation** | 100% | All answers included source references |
-| **Avg Latency** | 17.8s | Includes rate-limit delays |
+### Ablation Study - Chunk Size Comparison
+
+| Config | Chunk Size | Overlap | Correctness | Relevance | Sources | Latency |
+|--------|------------|---------|-------------|-----------|---------|---------|
+| **Small** | 500 | 100 | 47.4% | 35.5% | 100% | 8.1s |
+| **Medium** | 1000 | 200 | 48.0% | 34.4% | 100% | 15.2s |
+| **Large (Baseline)** | 2000 | 400 | 50.3% | 37.2% | 100% | 17.8s |
+
+### Detailed Results
+
+#### Config: 500 chunk / 100 overlap
+```json
+{
+  "chunk_size": 500,
+  "chunk_overlap": 100,
+  "avg_correctness": 0.474,
+  "avg_relevance": 0.355,
+  "has_sources_rate": 1.0,
+  "avg_latency": 8.09
+}
+```
+
+#### Config: 1000 chunk / 200 overlap
+```json
+{
+  "chunk_size": 1000,
+  "chunk_overlap": 200,
+  "avg_correctness": 0.480,
+  "avg_relevance": 0.344,
+  "has_sources_rate": 1.0,
+  "avg_latency": 15.2
+}
+```
+
+#### Config: 2000 chunk / 400 overlap (Baseline)
+```json
+{
+  "chunk_size": 2000,
+  "chunk_overlap": 400,
+  "avg_correctness": 0.503,
+  "avg_relevance": 0.372,
+  "has_sources_rate": 1.0,
+  "avg_latency": 17.8
+}
+```
+
+### Key Findings
+
+| Finding | Insight |
+|---------|---------|
+| ✅ **Sources 100%** | RAG properly grounds all answers in retrieved context |
+| 📊 **Larger chunks = better quality** | 2000/400 gives +2.9% correctness over 500/100 |
+| ⏱️ **Smaller chunks = faster** | 500/100 is 2x faster than 2000/400 |
+| ⚖️ **Trade-off** | Choose based on latency vs quality requirements |
 
 ### RAG Stack
 - **Embeddings**: `sentence-transformers/all-MiniLM-L6-v2` (HuggingFace)
 - **Vector Store**: FAISS (in-memory)
-- **Chunking**: 2000 chars, 400 overlap
 - **LLM**: Groq `llama-3.3-70b-versatile`
 - **Retrieval**: Top-5 similarity search
 
-### Analysis
-- ✅ **High source citation rate** – RAG properly grounds answers in retrieved context
-- ⚠️ **Moderate correctness** – Answers are semantically correct but use different phrasing than expected
-- ⚠️ **Lower relevance** – Simple keyword overlap metric underestimates actual quality
-- 📈 **Room for improvement** – Better chunking, reranking, or prompt tuning could boost scores
+## Roadmap
+
+| Week | Change | Status |
+|------|--------|--------|
+| 1 | Baseline v1 + eval | ✅ Done |
+| 2 | Chunking ablation | ✅ Done |
+| 3 | Reranking | 🔜 Next |
+| 4 | Hybrid retrieval (BM25 + vector) | Planned |
+| 5 | RRF fusion | Planned |
+| 6 | Vector DB swap (Qdrant) | Planned |
+| 7 | Query rewriting / HyDE | Planned |
+| 8 | Final report + ablation table | Planned |
 
 ## Notes
 - `.env` is ignored by git (see root `.gitignore`).
