@@ -31,8 +31,8 @@ if os.getenv("LANGCHAIN_API_KEY"):
     logger.info("Langsmith client initialized")
 
 ##Trying diffrent text splitter settings 1- 2000/400 2-1000/200 3-500/100
-chunk_size = 500
-chunk_overlap = 100
+chunk_size = 2000
+chunk_overlap = 400
 
 splitter = RecursiveCharacterTextSplitter(
     chunk_size=chunk_size,
@@ -190,7 +190,7 @@ Answer (bullets):
         input_variables=["context", "question"],
     )
     final_prompt = prompt.format(context=context, question=question)
-    llm = ChatGroq(model="openai/gpt-oss-120b", temperature=1)
+    llm = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=1)
     response = llm.invoke(final_prompt)
 
     answer = getattr(response, "text", None) or getattr(response, "content", str(response))

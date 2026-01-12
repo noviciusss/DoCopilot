@@ -43,49 +43,35 @@ The UI calls the backend at `http://localhost:8000` by default. Override with `N
 
 Evaluated on **40 Q&A pairs** from the AWS Overview whitepaper.
 
-### Ablation Study - Chunk Size Comparison
+### Ablation Study - Chunk Size Comparison (LLM Judge)
 
 | Config | Chunk Size | Overlap | Correctness | Relevance | Sources | Latency |
 |--------|------------|---------|-------------|-----------|---------|---------|
-| **Small** | 500 | 100 | 47.4% | 35.5% | 100% | 8.1s |
-| **Medium** | 1000 | 200 | 48.0% | 34.4% | 100% | 15.2s |
-| **Large (Baseline)** | 2000 | 400 | 50.3% | 37.2% | 100% | 17.8s |
+| Small | 500 | 100 | 88.5% | 88.7% | 100% | 6.9s |
+| Medium | 1000 | 200 | 85.5% | 86.5% | 100% | 9.8s |
+| **Large** | **2000** | **400** | **87.7%** | **89.0%** | **100%** | **2.1s** |
 
-### Detailed Results
+### Keyword-Based Scores (for reference)
 
-#### Config: 500 chunk / 100 overlap
-```json
-{
-  "chunk_size": 500,
-  "chunk_overlap": 100,
-  "avg_correctness": 0.474,
-  "avg_relevance": 0.355,
-  "has_sources_rate": 1.0,
-  "avg_latency": 8.09
-}
-```
+| Config | Chunk Size | Overlap | Correctness | Relevance |
+|--------|------------|---------|-------------|-----------|
+| Small | 500 | 100 | 48.2% | 39.4% |
+| Medium | 1000 | 200 | 47.3% | 36.3% |
+| Large | 2000 | 400 | 52.3% | 57.1% |
 
-#### Config: 1000 chunk / 200 overlap
-```json
-{
-  "chunk_size": 1000,
-  "chunk_overlap": 200,
-  "avg_correctness": 0.480,
-  "avg_relevance": 0.344,
-  "has_sources_rate": 1.0,
-  "avg_latency": 15.2
-}
-```
+### Best Config: 2000/400
 
-#### Config: 2000 chunk / 400 overlap (Baseline)
 ```json
 {
   "chunk_size": 2000,
   "chunk_overlap": 400,
-  "avg_correctness": 0.503,
-  "avg_relevance": 0.372,
+  "eval_method": "LLM-as-Judge (Groq llama-3.1-8b)",
+  "llm_correctness": 0.877,
+  "llm_relevance": 0.890,
+  "keyword_correctness": 0.523,
+  "keyword_relevance": 0.571,
   "has_sources_rate": 1.0,
-  "avg_latency": 17.8
+  "avg_latency": 2.12
 }
 ```
 
@@ -93,15 +79,25 @@ Evaluated on **40 Q&A pairs** from the AWS Overview whitepaper.
 
 | Finding | Insight |
 |---------|---------|
-| ✅ **Sources 100%** | RAG properly grounds all answers in retrieved context |
-| 📊 **Larger chunks = better quality** | 2000/400 gives +2.9% correctness over 500/100 |
-| ⏱️ **Smaller chunks = faster** | 500/100 is 2x faster than 2000/400 |
-| ⚖️ **Trade-off** | Choose based on latency vs quality requirements |
+| ✅ **2000/400 wins overall** | Best relevance (89%), fastest latency (2.1s) |
+| ✅ **LLM scores >> Keyword scores** | Keyword metrics underestimate quality by ~35% |
+| ✅ **85-88% correctness across configs** | All chunk sizes produce accurate answers |
+| ✅ **100% source grounding** | All answers cite retrieved context |
+| ⚡ **Larger chunks = faster** | 2000/400 is 3x faster than 500/100 |
+| 📊 **Sweet spot: 2000/400** | Best balance of quality + speed |
+
+### Evaluation Methods Comparison
+
+| Method | How it works | Pros | Cons |
+|--------|--------------|------|------|
+| **Keyword** | Word overlap between expected/predicted | Fast, free | Misses synonyms, underestimates |
+| **LLM Judge** | LLM scores semantic similarity | Accurate, understands meaning | Extra API calls, slight bias |
 
 ### RAG Stack
 - **Embeddings**: `sentence-transformers/all-MiniLM-L6-v2` (HuggingFace)
 - **Vector Store**: FAISS (in-memory)
-- **LLM**: Groq `llama-3.3-70b-versatile`
+- **LLM**: Groq `meta-llama/llama-4-scout-17b-16e-instruct`
+- **Eval LLM**: Groq `llama-3.1-8b-instant`
 - **Retrieval**: Top-5 similarity search
 
 ## Roadmap
@@ -109,7 +105,7 @@ Evaluated on **40 Q&A pairs** from the AWS Overview whitepaper.
 | Week | Change | Status |
 |------|--------|--------|
 | 1 | Baseline v1 + eval | ✅ Done |
-| 2 | Chunking ablation | ✅ Done |
+| 2 | Chunking ablation + LLM eval | ✅ Done |
 | 3 | Reranking | 🔜 Next |
 | 4 | Hybrid retrieval (BM25 + vector) | Planned |
 | 5 | RRF fusion | Planned |
@@ -121,3 +117,5 @@ Evaluated on **40 Q&A pairs** from the AWS Overview whitepaper.
 - `.env` is ignored by git (see root `.gitignore`).
 - Embeddings preload on server start for faster indexing after the first request.
 - Run `python evaluate_local.py` in `backend/` to reproduce evaluation results.
+- LLM-as-Judge uses a different model (`llama-3.1-8b`) than RAG to avoid self-bias.
+- **Conclusion**: 2000/400 chunks provide best quality + speed trade-off for this dataset.
