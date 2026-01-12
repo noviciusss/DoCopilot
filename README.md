@@ -59,6 +59,13 @@ Evaluated on **40 Q&A pairs** from the AWS Overview whitepaper.
 | Medium | 1000 | 200 | 47.3% | 36.3% |
 | Large | 2000 | 400 | 52.3% | 57.1% |
 
+### Ablation Study - Reranking (LLM Judge, 2000/400 chunks)
+
+| Config | Reranker | Initial K | Final K | Correctness | Relevance | Latency |
+|--------|----------|-----------|---------|-------------|-----------|---------|
+| Baseline | None | 5 | 5 | 87.7% | 89.0% | 2.1s |
+| + Rerank | ms-marco-MiniLM-L-6-v2 | 20 | 5 | 87.7% | 89.0% | 3.0s |
+
 ### Best Config: 2000/400
 
 ```json
@@ -75,16 +82,49 @@ Evaluated on **40 Q&A pairs** from the AWS Overview whitepaper.
 }
 ```
 
+### Best Config: 2000/400 + Reranking
+
+```json
+{
+  "chunk_size": 2000,
+  "chunk_overlap": 400,
+  "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+  "initial_k": 20,
+  "final_k": 5,
+  "eval_method": "LLM-as-Judge (Groq llama-3.1-8b)",
+  "llm_correctness": 0.877,
+  "llm_relevance": 0.890,
+  "keyword_correctness": 0.536,
+  "keyword_relevance": 0.600,
+  "has_sources_rate": 1.0,
+  "avg_latency": 3.00
+}
+```
+
 ### Key Findings
 
 | Finding | Insight |
 |---------|---------|
-| ✅ **2000/400 wins overall** | Best relevance (89%), fastest latency (2.1s) |
-| ✅ **LLM scores >> Keyword scores** | Keyword metrics underestimate quality by ~35% |
-| ✅ **85-88% correctness across configs** | All chunk sizes produce accurate answers |
-| ✅ **100% source grounding** | All answers cite retrieved context |
-| ⚡ **Larger chunks = faster** | 2000/400 is 3x faster than 500/100 |
-| 📊 **Sweet spot: 2000/400** | Best balance of quality + speed |
+| 2000/400 wins overall | Best relevance (89%), fastest latency (2.1s) |
+| LLM scores >> Keyword scores | Keyword metrics underestimate quality by ~35% |
+| 85-88% correctness across configs | All chunk sizes produce accurate answers |
+| 100% source grounding | All answers cite retrieved context |
+| Larger chunks = faster | 2000/400 is 3x faster than 500/100 |
+| Sweet spot: 2000/400 | Best balance of quality + speed |
+| Reranking: minimal impact | +0.88s latency, no quality gain on this dataset |
+
+<details>
+<summary><strong>Why Reranking Didn't Help Much</strong></summary>
+
+| Reason | Explanation |
+|--------|-------------|
+| Large chunks (2000) | Already capture full context, less retrieval noise |
+| Simple Q&A dataset | Questions are straightforward, top-5 already accurate |
+| Small corpus | 40-page PDF doesn't have many confusable chunks |
+
+> **Note**: Reranking typically helps more with smaller chunks, complex queries, or larger corpora.
+
+</details>
 
 ### Evaluation Methods Comparison
 
@@ -96,22 +136,26 @@ Evaluated on **40 Q&A pairs** from the AWS Overview whitepaper.
 ### RAG Stack
 - **Embeddings**: `sentence-transformers/all-MiniLM-L6-v2` (HuggingFace)
 - **Vector Store**: FAISS (in-memory)
+- **Reranker**: `cross-encoder/ms-marco-MiniLM-L-6-v2` (optional)
 - **LLM**: Groq `meta-llama/llama-4-scout-17b-16e-instruct`
 - **Eval LLM**: Groq `llama-3.1-8b-instant`
-- **Retrieval**: Top-5 similarity search
+- **Retrieval**: Top-20 → Rerank → Top-5
 
-## Roadmap
+<details>
+<summary><strong>Roadmap</strong></summary>
 
 | Week | Change | Status |
 |------|--------|--------|
-| 1 | Baseline v1 + eval | ✅ Done |
-| 2 | Chunking ablation + LLM eval | ✅ Done |
-| 3 | Reranking | 🔜 Next |
-| 4 | Hybrid retrieval (BM25 + vector) | Planned |
+| 1 | Baseline v1 + eval | Done |
+| 2 | Chunking ablation + LLM eval | Done |
+| 3 | Reranking | Done (minimal impact) |
+| 4 | Hybrid retrieval (BM25 + vector) | Next |
 | 5 | RRF fusion | Planned |
 | 6 | Vector DB swap (Qdrant) | Planned |
 | 7 | Query rewriting / HyDE | Planned |
 | 8 | Final report + ablation table | Planned |
+
+</details>
 
 ## Notes
 - `.env` is ignored by git (see root `.gitignore`).

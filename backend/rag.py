@@ -22,6 +22,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from langchain_groq import ChatGroq
 
+from sentence_transformers import CrossEncoder
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -58,9 +60,50 @@ _embeddings = HuggingFaceEmbeddings(
 _embeddings.embed_query("warmup")  # Warm up
 logger.info("Embedding model ready in %.2fs", time.time() - _load_start)
 
+# ============================================
+# PRELOAD Re_Ranking model AT STARTUP
+# ============================================
+logger.info("Preloading re-ranking model...")
+_rerank_start = time.time()
+_reranker = CrossEncoder(
+    'cross-encoder/ms-marco-MiniLM-L-6-v2',
+    device='cpu',
+    max_length=512,
+)
+_reranker.predict([("warmup question", "warmup passage")])  # Warm up
+logger.info("Re-ranking model ready in %.2fs", time.time() - _rerank_start)
+
+#Re ranking config
+RERANK_ENABLED = True ##Select to enable/disable re-ranking
+Intial_k= 20
+FINal_k = 5
 
 def _get_embedings() -> HuggingFaceEmbeddings:
     return _embeddings
+
+@traceable(name="rerank_documents")
+def rerank_documents(query:str,docs:List[Document],top_k:int = 5) -> List[Document]:
+    """Re-rank documents using CrossEncoder."""
+    if not docs:
+        return docs
+    
+    #create query-doc pairs
+    query_doc_pairs = [(query, doc.page_content) for doc in docs]
+    
+    #get relevance scores
+    scores = _reranker.predict(query_doc_pairs)
+    
+    #sort documents by scores
+    scored_docs = list(zip(docs, scores))
+    scored_docs.sort(key=lambda x: x[1], reverse=True)
+    
+    # Log reranking results
+    logger.info("Reranking: %d docs → top %d", len(docs), top_k)
+    for i, (doc, score) in enumerate(scored_docs[:top_k]):
+        logger.debug("  [%d] score=%.3f: %s...", i+1, score, doc.page_content[:50])
+    
+    # Return top K
+    return [doc for doc, _ in scored_docs[:top_k]]
 
 
 @traceable(name="load_pdf")
@@ -153,18 +196,24 @@ def get_vector_store(document_id: Optional[str] = None) -> FAISS:
 
 @traceable(
     name="ask_question",
-    metadata={"version": "1.0", "model": "gpt-oss-120b"},
+    metadata={"version": "1.1", "model": "llama-4-scout", "rerank": RERANK_ENABLED},
     tags=["rag", "qa"]
 )
 def ask_question(question: str, *, document_id: Optional[str] = None, k: int = 5) -> tuple[str, list[str]]:
     vectorstore = get_vector_store(document_id)
+    
+    #step 1 :intial retrival
+    Initial_k = Intial_k if RERANK_ENABLED else k
     retriever = vectorstore.as_retriever(
         search_type="similarity",
-        search_kwargs={"k": k}
+        search_kwargs={"k": Initial_k}
     )
     
     docs = retriever.invoke(question)
     
+    #Reranking step
+    if RERANK_ENABLED and len(docs) > k:
+        docs = rerank_documents(question, docs, top_k=k)
     context = "\n\n".join(
         f"[c{i+1}] {d.page_content}\nMETADATA: {d.metadata}"
         for i, d in enumerate(docs)
