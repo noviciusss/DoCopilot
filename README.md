@@ -41,7 +41,7 @@ The UI calls the backend at `http://localhost:8000` by default. Override with `N
 
 ---
 
-## 📊 Latest Evaluation Results (Qdrant Hybrid)
+##  Latest Evaluation Results (Qdrant Hybrid)
 
 ```
 ============================================================
@@ -75,12 +75,12 @@ Avg Latency:          2.86s
 | **Has Sources Rate** | 100% |
 | **Avg Latency** | 2.86s |
 
-> 💡 **LLM-based evaluation** uses semantic understanding to judge answer quality.  
+>  **LLM-based evaluation** uses semantic understanding to judge answer quality.  
 > **Keyword-based** is a baseline using exact string matching.
 
 ---
 
-## 🏗️ Current Architecture (Qdrant Hybrid)
+##  Current Architecture (Qdrant Hybrid)
 
 ```
 Question
@@ -114,9 +114,9 @@ Answer + Citations
 
 ---
 
-## ⚠️ Known Issues & Solutions
+##  Known Issues & Solutions
 
-> ### 🔴 Qdrant Local Storage Lock
+> ###  Qdrant Local Storage Lock
 > 
 > **Error:**
 > ```
@@ -129,15 +129,15 @@ Answer + Citations
 > **Solutions:**
 > | Option | Code | Persistence |
 > |--------|------|-------------|
-> | In-Memory | `location=":memory:"` | ❌ No |
-> | Docker Server | `url="http://localhost:6333"` | ✅ Yes |
-> | Qdrant Cloud | `url="https://xxx.cloud.qdrant.io"` | ✅ Yes |
+> | In-Memory | `location=":memory:"` |  No |
+> | Docker Server | `url="http://localhost:6333"` |  Yes |
+> | Qdrant Cloud | `url="https://xxx.cloud.qdrant.io"` |  Yes |
 > 
 > **Current:** Using `:memory:` for development (no persistence).
 
 ---
 
-> ### 🔴 Version Mismatch Error
+> ###  Version Mismatch Error
 > 
 > **Error:**
 > ```
@@ -150,7 +150,7 @@ Answer + Citations
 
 ---
 
-## 📈 Historical Evaluation Results
+## Historical Evaluation Results
 
 ### Ablation Study - Chunk Size Comparison (LLM Judge)
 
@@ -199,7 +199,7 @@ Answer + Citations
 
 ---
 
-## 🆚 FAISS + BM25 vs Qdrant Comparison
+##  FAISS + BM25 vs Qdrant Comparison
 
 | Aspect | FAISS + Manual BM25 | Qdrant Hybrid |
 |--------|---------------------|---------------|
@@ -211,7 +211,7 @@ Answer + Citations
 | Latency | 2.2s | 2.86s |
 | Maintenance | Two indexes | Single system |
 
-> 📝 Qdrant slightly higher correctness, similar relevance, slightly slower due to sparse embedding computation.
+> Qdrant slightly higher correctness, similar relevance, slightly slower due to sparse embedding computation.
 
 ---
 
@@ -263,7 +263,7 @@ Query: "What is EC2 pricing?"
 
 ---
 
-## 🔧 Configuration
+##  Configuration
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -276,7 +276,7 @@ Query: "What is EC2 pricing?"
 
 ---
 
-## 📚 Tech Stack
+##  Tech Stack
 
 | Component | Technology |
 |-----------|------------|
