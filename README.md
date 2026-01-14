@@ -41,7 +41,7 @@ The UI calls the backend at `http://localhost:8000` by default. Override with `N
 
 ---
 
-##  Latest Evaluation Results (Qdrant Hybrid)
+## Latest Evaluation Results (Qdrant Hybrid)
 
 ```
 ============================================================
@@ -75,48 +75,48 @@ Avg Latency:          2.86s
 | **Has Sources Rate** | 100% |
 | **Avg Latency** | 2.86s |
 
->  **LLM-based evaluation** uses semantic understanding to judge answer quality.  
+> **LLM-based evaluation** uses semantic understanding to judge answer quality.  
 > **Keyword-based** is a baseline using exact string matching.
 
 ---
 
-##  Current Architecture (Qdrant Hybrid)
+## Current Architecture (Qdrant Hybrid)
 
 ```
 Question
-    │
-    ▼
-┌─────────────────────────────────────┐
-│      QDRANT HYBRID SEARCH           │
-│  ┌───────────┐    ┌───────────┐     │
-│  │  Dense    │    │  Sparse   │     │
-│  │ (Vector)  │    │  (BM25)   │     │
-│  └───────────┘    └───────────┘     │
-│         │              │            │
-│         └──────┬───────┘            │
-│                ▼                    │
-│         RRF Fusion (built-in)       │
-└─────────────────────────────────────┘
-    │
-    ▼ Top 20
-┌─────────────────────────────────────┐
-│      CROSS-ENCODER RERANK           │
-└─────────────────────────────────────┘
-    │
-    ▼ Top 5
-┌─────────────────────────────────────┐
-│      LLM (Llama-4-Scout)            │
-└─────────────────────────────────────┘
-    │
-    ▼
+    |
+    v
++-------------------------------------+
+|      QDRANT HYBRID SEARCH           |
+|  +-----------+    +-----------+     |
+|  |  Dense    |    |  Sparse   |     |
+|  | (Vector)  |    |  (BM25)   |     |
+|  +-----------+    +-----------+     |
+|         |              |            |
+|         +------+-------+            |
+|                v                    |
+|         RRF Fusion (built-in)       |
++-------------------------------------+
+    |
+    v Top 20
++-------------------------------------+
+|      CROSS-ENCODER RERANK           |
++-------------------------------------+
+    |
+    v Top 5
++-------------------------------------+
+|      LLM (Llama-4-Scout)            |
++-------------------------------------+
+    |
+    v
 Answer + Citations
 ```
 
 ---
 
-##  Known Issues & Solutions
+## Known Issues & Solutions
 
-> ###  Qdrant Local Storage Lock
+> ### Qdrant Local Storage Lock
 > 
 > **Error:**
 > ```
@@ -129,15 +129,15 @@ Answer + Citations
 > **Solutions:**
 > | Option | Code | Persistence |
 > |--------|------|-------------|
-> | In-Memory | `location=":memory:"` |  No |
-> | Docker Server | `url="http://localhost:6333"` |  Yes |
-> | Qdrant Cloud | `url="https://xxx.cloud.qdrant.io"` |  Yes |
+> | In-Memory | `location=":memory:"` | No |
+> | Docker Server | `url="http://localhost:6333"` | Yes |
+> | Qdrant Cloud | `url="https://xxx.cloud.qdrant.io"` | Yes |
 > 
 > **Current:** Using `:memory:` for development (no persistence).
 
 ---
 
-> ###  Version Mismatch Error
+> ### Version Mismatch Error
 > 
 > **Error:**
 > ```
@@ -199,7 +199,7 @@ Answer + Citations
 
 ---
 
-##  FAISS + BM25 vs Qdrant Comparison
+## FAISS + BM25 vs Qdrant Comparison
 
 | Aspect | FAISS + Manual BM25 | Qdrant Hybrid |
 |--------|---------------------|---------------|
@@ -231,23 +231,23 @@ Answer + Citations
 
 ```
 Query: "What is EC2 pricing?"
-         │
-         ▼
-┌─────────────────────────────────────────────────┐
-│           QDRANT (Single Index)                 │
-│                                                 │
-│  ┌─────────────────┐  ┌─────────────────┐      │
-│  │  Dense Vectors  │  │ Sparse Vectors  │      │
-│  │  (MiniLM-L6)    │  │ (Qdrant/bm25)   │      │
-│  └────────┬────────┘  └────────┬────────┘      │
-│           │                    │                │
-│           └────────┬───────────┘                │
-│                    ▼                            │
-│           RRF Fusion (automatic)                │
-└─────────────────────────────────────────────────┘
-                    │
-                    ▼
-         Top 20 → Reranker → Top 5 → LLM
+         |
+         v
++-------------------------------------------------+
+|           QDRANT (Single Index)                 |
+|                                                 |
+|  +-----------------+  +-----------------+       |
+|  |  Dense Vectors  |  | Sparse Vectors  |       |
+|  |  (MiniLM-L6)    |  | (Qdrant/bm25)   |       |
+|  +--------+--------+  +--------+--------+       |
+|           |                    |                |
+|           +--------+-----------+                |
+|                    v                            |
+|           RRF Fusion (automatic)                |
++-------------------------------------------------+
+                    |
+                    v
+         Top 20 -> Reranker -> Top 5 -> LLM
 ```
 
 **Replaces ~100 lines of manual BM25 + RRF code!**
@@ -263,7 +263,7 @@ Query: "What is EC2 pricing?"
 
 ---
 
-##  Configuration
+## Configuration
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -276,7 +276,7 @@ Query: "What is EC2 pricing?"
 
 ---
 
-##  Tech Stack
+## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
@@ -296,14 +296,12 @@ Query: "What is EC2 pricing?"
 
 | Week | Change | Status |
 |------|--------|--------|
-| 1 | Baseline v1 + eval | ✅ Done |
-| 2 | Chunking ablation + LLM eval | ✅ Done |
-| 3 | Reranking | ✅ Done |
-| 4 | Hybrid retrieval (BM25 + Vector + RRF) | ✅ Done |
-| 5 | Vector DB swap (Qdrant) | ✅ Done |
-| 6 | Query rewriting / HyDE | 🔜 Next |
-| 7 | Multi-document support | 📋 Planned |
-| 8 | Final report + ablation table | 📋 Planned |
+| 1 | Baseline v1 + eval | Done |
+| 2 | Chunking ablation + LLM eval | Done |
+| 3 | Reranking | Done |
+| 4 | Hybrid retrieval (BM25 + Vector + RRF) | Done |
+| 5 | Vector DB swap (Qdrant) | Done |
+| 6 | Final report + ablation table | Done |
 
 </details>
 
@@ -316,6 +314,6 @@ Query: "What is EC2 pricing?"
 - LLM-as-Judge uses a different model (`llama-3.1-8b`) than RAG to avoid self-bias.
 - **Conclusion**: Qdrant hybrid search provides best quality with minimal code.
 
-## 📄 License
+## License
 
 MIT License
