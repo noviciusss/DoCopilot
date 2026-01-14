@@ -307,6 +307,40 @@ Query: "What is EC2 pricing?"
 
 ---
 
+## Future Plans
+
+<details>
+<summary><strong>Coming Soon</strong></summary>
+
+| Feature | What it does | Expected Impact |
+|---------|--------------|-----------------|
+| HyDE | Generate hypothetical answer, embed that instead of query | Better retrieval for complex questions |
+| Query Rewriting | LLM reformulates vague queries before search | Handles ambiguous user questions |
+| Multi-Document Support | Chat across multiple PDFs simultaneously | Enterprise use case |
+| Qdrant Docker/Cloud | Persistent storage (currently in-memory) | Production-ready deployment |
+| Conversation Memory | Remember previous Q&A in session | Multi-turn conversations |
+| Streaming Responses | Token-by-token output | Better UX, feels faster |
+
+</details>
+
+<details>
+<summary><strong>Advanced Features</strong></summary>
+
+| Feature | What it does | Use Case |
+|---------|--------------|----------|
+| Agentic RAG | Multi-step reasoning, tool use | Complex multi-hop questions |
+| Query Decomposition | Break complex query into sub-queries | "Compare X and Y" type questions |
+| Adaptive Retrieval | Dynamically adjust k based on confidence | Optimize latency vs accuracy |
+| Fine-tuned Embeddings | Domain-specific embedding model | Specialized vocabularies |
+| Multi-modal RAG | Extract info from images/tables in PDFs | Technical documents |
+| Caching Layer | Cache frequent queries | Cost reduction, speed |
+| RAGAS Evaluation | More comprehensive eval metrics | Faithfulness, context relevance |
+| Guardrails | Safety filters, PII detection | Enterprise compliance |
+
+</details>
+
+---
+
 ## Notes
 - `.env` is ignored by git (see root `.gitignore`).
 - Embeddings preload on server start for faster indexing after the first request.
