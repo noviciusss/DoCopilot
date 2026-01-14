@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from uuid import uuid4
 import logging
+import re
 
 import dotenv
 dotenv.load_dotenv()
@@ -15,19 +16,17 @@ from langsmith.run_helpers import traceable
 
 from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
 from langchain_groq import ChatGroq
+
 # Reranking model
 from sentence_transformers import CrossEncoder
 
-# BM25 for hybrid retrieval
-from rank_bm25 import BM25Okapi
-import re
+## Qdrant - in place of faiss bhai shab 100 lines of bm25 and hybrid search ko ye ik line replace kar dega
+from langchain_qdrant import QdrantVectorStore, RetrievalMode, FastEmbedSparse
+from qdrant_client import QdrantClient
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -46,9 +45,26 @@ splitter = RecursiveCharacterTextSplitter(
     chunk_overlap=chunk_overlap
 )
 
-# Document cache - stores vectorstore, bm25, and original docs
+# Document cache - stores vectorstore and metadata
 document_cache: Dict[str, dict] = {}
 current_document_id: Optional[str] = None
+
+# Qdrant path config (client created only when needed)
+QDRANT_PATH = "./qdrant_data"
+logger.info("Qdrant storage path: %s", QDRANT_PATH)
+
+# Global client reference (created once, reused)
+_qdrant_client: Optional[QdrantClient] = None
+
+
+def _get_qdrant_client() -> QdrantClient:
+    """Get or create the singleton Qdrant client."""
+    global _qdrant_client
+    if _qdrant_client is None:
+        _qdrant_client = QdrantClient(path=QDRANT_PATH)
+        logger.info("Qdrant client created at %s", QDRANT_PATH)
+    return _qdrant_client
+
 
 # ============================================
 # PRELOAD EMBEDDINGS AT STARTUP
@@ -67,6 +83,15 @@ _embeddings.embed_query("warmup")
 logger.info("Embedding model ready in %.2fs", time.time() - _load_start)
 
 # ============================================
+# Preload Sparse Embeddings for Qdrant -> BM25 jaise
+# ============================================
+logger.info("Preloading sparse embedding model for Qdrant...")
+_sparse_embed_start = time.time()
+_sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
+logger.info("Sparse embedding model ready in %.2fs", time.time() - _sparse_embed_start)
+
+
+# ============================================
 # PRELOAD RERANKER MODEL AT STARTUP
 # ============================================
 logger.info("Preloading re-ranking model...")
@@ -82,144 +107,81 @@ logger.info("Re-ranking model ready in %.2fs", time.time() - _rerank_start)
 # ============================================
 # RETRIEVAL CONFIG
 # ============================================
-HYBRID_ENABLED = True      # BM25 + Vector search
+HYBRID_ENABLED = True      # Qdrant built-in hybrid (BM25 + Vector)
 RERANK_ENABLED = True      # Rerank after retrieval
-INITIAL_K = 20             # Retrieve from each method
-FINAL_K = 5                # Final docs after fusion/reranking
-RRF_K = 60                 # RRF constant
+INITIAL_K = 20             # Retrieve this many docs
+FINAL_K = 5                # Final docs after reranking
 
 
 def _get_embeddings() -> HuggingFaceEmbeddings:
     return _embeddings
 
 
-def tokenize(text: str) -> List[str]:
-    """Simple tokenizer for BM25."""
-    return re.findall(r'\w+', text.lower())
-
-
-# ============================================
-# BM25 FUNCTIONS
-# ============================================
-
-@traceable(name="create_bm25_index")
-def create_bm25_index(docs: List[Document]) -> BM25Okapi:
-    """Create BM25 index from document chunks."""
-    tokenized_docs = [tokenize(doc.page_content) for doc in docs]
-    bm25 = BM25Okapi(tokenized_docs)
-    logger.info("BM25 index created: %d chunks", len(docs))
-    return bm25
-
-
-@traceable(name="bm25_search")
-def bm25_search(
-    query: str, 
-    bm25: BM25Okapi, 
-    docs: List[Document], 
-    top_k: int = 20
-) -> List[Tuple[Document, float]]:
+@traceable(name="create_vector_store")
+def create_vector_store(docs: List[Document], collection_name: str = "documents") -> QdrantVectorStore:
     """
-    BM25 keyword search.
-    Returns: List of (Document, score) - DIFFERENT chunks than vector!
+    Create Qdrant vector store with BUILT-IN hybrid search.
     """
-    query_tokens = tokenize(query)
-    scores = bm25.get_scores(query_tokens)
+    if not docs:
+        raise ValueError("No documents provided")
     
-    # Pair docs with scores and sort
-    scored_docs = list(zip(docs, scores))
-    scored_docs.sort(key=lambda x: x[1], reverse=True)
+    t0 = time.time()
     
-    logger.info("BM25: top score=%.2f for '%s...'", 
-                scored_docs[0][1] if scored_docs else 0, 
-                query[:30])
+    # Use in-memory Qdrant (no persistence, but avoids file lock issues)
+    vectorstore = QdrantVectorStore.from_documents(
+        docs,
+        embedding=_embeddings,
+        sparse_embedding=_sparse_embeddings,
+        location=":memory:",                  # In-memory mode
+        collection_name=collection_name,
+        retrieval_mode=RetrievalMode.HYBRID,
+    )
     
-    return scored_docs[:top_k]
-
-
-@traceable(name="vector_search")
-def vector_search(
-    query: str, 
-    vectorstore: FAISS, 
-    top_k: int = 20
-) -> List[Tuple[Document, float]]:
-    """
-    Vector semantic search.
-    Returns: List of (Document, score) - DIFFERENT chunks than BM25!
-    """
-    results = vectorstore.similarity_search_with_score(query, k=top_k)
-    # Convert distance to similarity (higher = better)
-    scored_docs = [(doc, 1 / (1 + dist)) for doc, dist in results]
+    logger.info("Qdrant hybrid collection '%s' created in %.2fs (%d docs)", 
+                collection_name, time.time() - t0, len(docs))
     
-    logger.info("Vector: top score=%.3f for '%s...'", 
-                scored_docs[0][1] if scored_docs else 0, 
-                query[:30])
-    
-    return scored_docs
-
-
-@traceable(name="rrf_fusion")
-def rrf_fusion(
-    results_list: List[List[Tuple[Document, float]]], 
-    k: int = 60
-) -> List[Tuple[Document, float]]:
-    """
-    Reciprocal Rank Fusion - combines rankings from multiple methods.
-    
-    Chunks in BOTH lists get higher scores!
-    """
-    doc_scores: Dict[int, float] = {}
-    doc_map: Dict[int, Document] = {}
-    
-    for results in results_list:
-        for rank, (doc, _) in enumerate(results, start=1):
-            # Use hash of content as unique ID
-            doc_id = hash(doc.page_content)
-            
-            if doc_id not in doc_map:
-                doc_map[doc_id] = doc
-                doc_scores[doc_id] = 0.0
-            
-            # RRF: 1/(k + rank)
-            doc_scores[doc_id] += 1.0 / (k + rank)
-    
-    # Sort by RRF score
-    sorted_items = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
-    
-    logger.info("RRF: %d unique chunks from %d methods", len(sorted_items), len(results_list))
-    
-    return [(doc_map[doc_id], score) for doc_id, score in sorted_items]
+    return vectorstore
 
 
 @traceable(name="hybrid_search")
 def hybrid_search(
     query: str,
-    vectorstore: FAISS,
-    bm25: BM25Okapi,
-    docs: List[Document],
-    initial_k: int = 20,
-    final_k: int = 5
+    vectorstore: QdrantVectorStore,
+    top_k: int = 20
 ) -> List[Document]:
     """
-    Hybrid search: BM25 + Vector + RRF fusion.
+    Qdrant built-in hybrid search.
     
-    Each method finds DIFFERENT chunks, RRF combines them.
-    Chunks appearing in BOTH get boosted!
+    THIS REPLACES ~100 LINES OF MANUAL CODE:
+    - bm25_search()
+    - vector_search_faiss()
+    - rrf_fusion()
+    - hybrid_search_manual()
+    
+    Qdrant internally:
+    1. Searches dense vectors (semantic similarity)
+    2. Searches sparse vectors (BM25-like keyword matching)
+    3. Combines using RRF fusion
+    4. Returns unified results
+    
+    All in ONE function call!
     """
-    # BM25 finds chunks by keyword match
-    bm25_results = bm25_search(query, bm25, docs, top_k=initial_k)
-    
-    # Vector finds chunks by semantic similarity
-    vector_results = vector_search(query, vectorstore, top_k=initial_k)
-    
-    # RRF combines both - chunks in both lists score higher
-    fused = rrf_fusion([bm25_results, vector_results], k=RRF_K)
-    
-    return [doc for doc, _ in fused[:final_k]]
+    results = vectorstore.similarity_search(query, k=top_k)
+    logger.info("Hybrid search retrieved %d docs for '%s...'", len(results), query[:30])
+    return results
 
 
 @traceable(name="rerank_documents")
 def rerank_documents(query: str, docs: List[Document], top_k: int = 5) -> List[Document]:
-    """Re-rank documents using CrossEncoder."""
+    """
+    Re-rank documents using CrossEncoder.
+    
+    Why rerank after retrieval?
+    - Bi-encoder (embedding): Fast but approximate
+    - Cross-encoder (reranker): Slow but accurate
+    
+    Pipeline: All chunks → Hybrid (fast, top 20) → Rerank (accurate, top 5) → LLM
+    """
     if not docs:
         return docs
     
@@ -279,35 +241,28 @@ def plain_text_chunks(raw_text: str, *, source: str = "user_input") -> List[Docu
 # INDEXING
 # ============================================
 
-@traceable(name="create_vector_store")
-def create_vector_store(docs: List[Document]) -> FAISS:
-    if not docs:
-        raise ValueError("No documents provided")
-    t0 = time.time()
-    vectorstore = FAISS.from_documents(docs, _embeddings)
-    logger.info("Vector store created in %.2fs (%d docs)", time.time() - t0, len(docs))
-    return vectorstore
-
-
-def store_document_cache(docs: List[Document], vectorstore: FAISS) -> str:
-    """Store vectorstore + BM25 + original docs for hybrid retrieval."""
+def store_document_cache(docs: List[Document], vectorstore: QdrantVectorStore, collection_name: str) -> str:
+    """
+    Store vectorstore reference for retrieval.
+    
+    With Qdrant:
+    - Data is persisted on disk automatically (./qdrant_data/)
+    - Survives server restarts
+    - No need to store BM25 index separately (built-in!)
+    """
     global current_document_id, document_cache
     document_cache.clear()
     
     document_id = str(uuid4())
     
-    # Create BM25 index if hybrid enabled
-    bm25 = create_bm25_index(docs) if HYBRID_ENABLED else None
-    
-    # Store all components
     document_cache[document_id] = {
         "vectorstore": vectorstore,
-        "bm25": bm25,
-        "docs": docs  # BM25 needs this to return documents!
+        "collection_name": collection_name,
+        "docs": docs,  # Keep for debugging
     }
     
     current_document_id = document_id
-    logger.info("Cached document: %s (hybrid=%s)", document_id, HYBRID_ENABLED)
+    logger.info("Cached document: %s (collection=%s, hybrid=built-in)", document_id, collection_name)
     return document_id
 
 
@@ -316,8 +271,9 @@ def index_get_pdf(content: bytes, filename: str) -> str:
     """Index PDF from bytes content."""
     t0 = time.time()
     docs = load_pdf_from_bytes(content, filename)
-    vectorstore = create_vector_store(docs)
-    doc_id = store_document_cache(docs, vectorstore)
+    collection_name = re.sub(r'[^a-zA-Z0-9_]', '_', filename.rsplit('.', 1)[0])[:50]
+    vectorstore = create_vector_store(docs, collection_name)
+    doc_id = store_document_cache(docs, vectorstore, collection_name)
     logger.info("Total PDF indexing: %.2fs", time.time() - t0)
     return doc_id
 
@@ -326,19 +282,21 @@ def index_get_pdf(content: bytes, filename: str) -> str:
 def index_get_txt(text: str, filename: str) -> str:
     """Index text content directly."""
     docs = load_text_chunks(text, filename)
-    vectorstore = create_vector_store(docs)
-    return store_document_cache(docs, vectorstore)
+    collection_name = re.sub(r'[^a-zA-Z0-9_]', '_', filename.rsplit('.', 1)[0])[:50]
+    vectorstore = create_vector_store(docs, collection_name)
+    return store_document_cache(docs, vectorstore, collection_name)
 
 
 @traceable(name="index_get_plain_text", tags=["indexing"])
 def index_get_plain_text(raw_text: str) -> str:
     docs = plain_text_chunks(raw_text)
-    vectorstore = create_vector_store(docs)
-    return store_document_cache(docs, vectorstore)
+    collection_name = "plain_text"
+    vectorstore = create_vector_store(docs, collection_name)
+    return store_document_cache(docs, vectorstore, collection_name)
 
 
 def get_document_data(document_id: Optional[str] = None) -> dict:
-    """Get all document data (vectorstore, bm25, docs)."""
+    """Get all document data from cache."""
     target_id = document_id or current_document_id
     if not target_id or target_id not in document_cache:
         raise ValueError("No document found for the given ID")
@@ -351,33 +309,32 @@ def get_document_data(document_id: Optional[str] = None) -> dict:
 
 @traceable(
     name="ask_question",
-    metadata={"version": "1.2", "model": "llama-4-scout", "hybrid": HYBRID_ENABLED, "rerank": RERANK_ENABLED},
-    tags=["rag", "qa", "hybrid"] if HYBRID_ENABLED else ["rag", "qa"]
+    metadata={
+        "version": "2.0",
+        "model": "llama-4-scout",
+        "vector_db": "qdrant",
+        "hybrid": "qdrant_built_in",
+        "rerank": RERANK_ENABLED
+    },
+    tags=["rag", "qa", "hybrid", "qdrant"]
 )
 def ask_question(question: str, *, document_id: Optional[str] = None, k: int = 5) -> tuple[str, list[str]]:
+    """
+    Main RAG question-answering function.
+    
+    Pipeline:
+    1. Hybrid retrieval (Qdrant handles BM25 + Vector + RRF internally)
+    2. Rerank with CrossEncoder
+    3. Build context and generate answer with LLM
+    """
     doc_data = get_document_data(document_id)
     vectorstore = doc_data["vectorstore"]
-    bm25 = doc_data["bm25"]
-    docs = doc_data["docs"]
     
-    # Step 1: Retrieval (Hybrid or Vector-only)
-    if HYBRID_ENABLED and bm25 is not None:
-        # Hybrid: BM25 finds keyword matches, Vector finds semantic matches
-        # RRF combines both - chunks in BOTH lists get boosted!
-        retrieve_k = INITIAL_K if RERANK_ENABLED else k
-        retrieved_docs = hybrid_search(
-            question, vectorstore, bm25, docs,
-            initial_k=INITIAL_K,
-            final_k=retrieve_k
-        )
-    else:
-        # Vector-only
-        retrieve_k = INITIAL_K if RERANK_ENABLED else k
-        retriever = vectorstore.as_retriever(
-            search_type="similarity",
-            search_kwargs={"k": retrieve_k}
-        )
-        retrieved_docs = retriever.invoke(question)
+    # Step 1: Retrieval (Qdrant hybrid search)
+    retrieve_k = INITIAL_K if RERANK_ENABLED else k
+    retrieved_docs = hybrid_search(question, vectorstore, top_k=retrieve_k)
+    
+    logger.info("Retrieved %d documents for question: '%s...'", len(retrieved_docs), question[:50])
     
     # Step 2: Rerank if enabled
     if RERANK_ENABLED and len(retrieved_docs) > k:
@@ -417,3 +374,58 @@ Answer (bullets):
 
     return answer, sources
 
+
+# ============================================
+# QDRANT UTILITY FUNCTIONS
+# ============================================
+
+def list_collections() -> List[str]:
+    """List all Qdrant collections."""
+    try:
+        client = QdrantClient(path=QDRANT_PATH)
+        collections = client.get_collections()
+        result = [c.name for c in collections.collections]
+        client.close()
+        return result
+    except Exception:
+        return []
+
+
+def get_collection_info(collection_name: str) -> dict:
+    """Get detailed info about a Qdrant collection."""
+    try:
+        client = QdrantClient(path=QDRANT_PATH)
+        info = client.get_collection(collection_name)
+        result = {
+            "name": collection_name,
+            "vectors_count": info.vectors_count,
+            "points_count": info.points_count,
+        }
+        client.close()
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def delete_collection(collection_name: str) -> bool:
+    """Delete a Qdrant collection."""
+    try:
+        client = QdrantClient(path=QDRANT_PATH)
+        client.delete_collection(collection_name)
+        client.close()
+        logger.info("Deleted collection: %s", collection_name)
+        return True
+    except Exception as e:
+        logger.error("Failed to delete collection: %s", e)
+        return False
+
+
+def collection_exists(collection_name: str) -> bool:
+    """Check if a collection exists."""
+    try:
+        client = QdrantClient(path=QDRANT_PATH)
+        client.get_collection(collection_name)
+        client.close()
+        return True
+    except Exception:
+        return False

@@ -2,12 +2,12 @@
   "summary": {
     "total_questions": 40,
     "successful": 40,
-    "llm_correctness": 0.8874999999999995,
-    "llm_relevance": 0.9074999999999994,
-    "keyword_correctness": 0.5547234776317593,
-    "keyword_relevance": 0.5887180527805529,
+    "llm_correctness": 0.8924999999999994,
+    "llm_relevance": 0.9049999999999994,
+    "keyword_correctness": 0.577445331800982,
+    "keyword_relevance": 0.5776466242091243,
     "has_sources_rate": 1.0,
-    "avg_latency": 2.1646800577640533
+    "avg_latency": 2.8620620906352996
   },
   "results": [
     {
@@ -23,7 +23,7 @@
       "keyword_correctness": 0.75,
       "keyword_relevance": 0.3333333333333333,
       "has_sources": 1.0,
-      "latency": 2.285991907119751,
+      "latency": 3.345569610595703,
       "success": true
     },
     {
@@ -39,46 +39,46 @@
       "keyword_correctness": 0.625,
       "keyword_relevance": 0.8,
       "has_sources": 1.0,
-      "latency": 2.2496955394744873,
+      "latency": 2.428421974182129,
       "success": true
     },
     {
       "id": "aws-q03",
       "question": "What is the difference between a cloud-based deployment model and an on-premises private cloud model?",
       "expected": "Cloud-based runs in the provider cloud; private cloud on-premises runs in customer facilities using virtualization/resource tools and lacks many cloud benefits.",
-      "predicted": "A cloud-based application is fully deployed in the cloud and all parts of the application run in the cloud [c1]. \n* A cloud-based deployment model provides different levels of control, flexibility, and management compared to an on-premises private cloud model.\n\nIn contrast, a private cloud (on-premises) deployment uses virtualization and resource management tools on-premises, providing dedicated resources but not many of the benefits of cloud computing [c1].\n\nHere are the main differences:\n* **Location**: Cloud-based deployment is fully deployed in the cloud, while on-premises private cloud deployment is done on-site.\n* **Benefits**: Cloud-based deployment offers benefits like scalability and flexibility, whereas on-premises deployment provides control and security.\n* **Resource management**: Cloud-based deployment uses cloud provider's resources and management tools, whereas on-premises deployment uses organization's own resources and management tools. \n\nLet me know if you need more information!",
+      "predicted": "Here are the differences between a cloud-based deployment model and an on-premises private cloud model [c1]:\n\n* A cloud-based application is fully deployed in the cloud and all parts of the application run in the cloud [c1].\n* In contrast, an on-premises private cloud deployment involves deploying resources on-premises, using virtualization and resource management tools [c1].\n* Cloud-based applications can take advantage of cloud computing benefits such as scalability and flexibility, whereas on-premises private cloud deployments do not provide many of the benefits of cloud computing [c1].\n* On-premises deployment is sometimes sought for its ability to provide dedicated resources [c1]. \n\nLet me know if you need further clarification!",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 0.8,
       "llm_relevance": 0.9,
-      "keyword_correctness": 0.5,
-      "keyword_relevance": 0.7,
+      "keyword_correctness": 0.5555555555555556,
+      "keyword_relevance": 0.8,
       "has_sources": 1.0,
-      "latency": 2.1481411457061768,
+      "latency": 2.216949939727783,
       "success": true
     },
     {
       "id": "aws-q04",
       "question": "What is a hybrid deployment model in cloud computing?",
       "expected": "Connecting cloud resources with existing non-cloud (often on-premises) infrastructure and applications.",
-      "predicted": "A hybrid deployment model in cloud computing is a way to connect infrastructure and applications between cloud-based resources and existing resources that are not located in the cloud [c2].\n\n* It is commonly used to extend and grow an organization's infrastructure into the cloud while connecting cloud resources to the internal system [c2].\n* A hybrid deployment model typically involves a combination of cloud-based and on-premises infrastructure [c2].\n* AWS provides solutions for hybrid deployment, including AWS Outposts, which brings native AWS services, infrastructure, and operating models to on-premises facilities [c3].\n* For more information on how AWS can help with hybrid deployment, you can visit the Hybrid Cloud with AWS page [c2].",
+      "predicted": "* A hybrid deployment model in cloud computing is a way to connect infrastructure and applications between cloud-based resources and existing resources that are not located in the cloud [c2].\n* It is commonly used to extend and grow an organization's infrastructure into the cloud while connecting cloud resources to the internal system [c2].\n* The most common method of hybrid deployment is between the cloud and existing on-premises infrastructure [c2].\n* AWS offers solutions for hybrid deployment, including AWS Outposts, which brings native AWS services, infrastructure, and operating models to on-premises facilities [c3].",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 0.9,
       "llm_relevance": 0.9,
-      "keyword_correctness": 0.6363636363636364,
+      "keyword_correctness": 0.5454545454545454,
       "keyword_relevance": 0.8333333333333334,
       "has_sources": 1.0,
-      "latency": 2.0341129302978516,
+      "latency": 2.0505051612854004,
       "success": true
     },
     {
       "id": "aws-q05",
       "question": "What is an AWS Region?",
       "expected": "A physical location in the world where AWS has multiple Availability Zones.",
-      "predicted": "An AWS Region is a physical location in the world where AWS has multiple Availability Zones [c1]. \n\nAvailability Zones consist of one or more discrete data centers, each with redundant power, networking, and connectivity, housed in separate facilities [c1]. \n\nSome examples of AWS Regions include:\n* AWS Europe (Stockholm)\n* AWS US East (Northern Virginia)\n* AWS US East (Ohio)\n* AWS US West (Northern California)\n* AWS US West (Oregon)\n* AWS Canada (Central)\n* AWS Europe (Frankfurt)\n* AWS Europe (Ireland)\n* AWS Europe (London)\n* AWS Europe (Paris)\n* AWS Europe (Milan)\n* AWS Asia Pacific (Singapore)\n* AWS Asia Pacific (Sydney)\n* AWS Asia Pacific (Tokyo)\n* AWS Asia Pacific (Mumbai) \n* AWS South America (Sao Paulo)\n* AWS Asia Pacific (Seoul)\n* AWS GovCloud (US West) [c2]\n\nLet me know if you need more information!",
+      "predicted": "An AWS Region is a physical location in the world where AWS has multiple Availability Zones [c1]. \n* It consists of multiple Availability Zones, which are discrete data centers with redundant power, networking, and connectivity [c1]. \n* These Regions allow for highly available, fault-tolerant, and scalable applications and databases [c1]. \n* The latest information on AWS Cloud Availability Zones and AWS Regions can be found on the AWS Global Infrastructure page [c1].",
       "sources": [
         "aws-overview.pdf"
       ],
@@ -87,46 +87,46 @@
       "keyword_correctness": 0.9166666666666666,
       "keyword_relevance": 0.5,
       "has_sources": 1.0,
-      "latency": 2.2676126956939697,
+      "latency": 1.884979009628296,
       "success": true
     },
     {
       "id": "aws-q06",
       "question": "What is an Availability Zone (AZ)?",
       "expected": "One or more discrete data centers with redundant power/networking in separate facilities within a Region.",
-      "predicted": "An Availability Zone (AZ) is a discrete data center with redundant power, networking, and connectivity, housed in a separate facility [c1]. \nHere are some key characteristics of an Availability Zone:\n* Consists of one or more discrete data centers [c1]\n* Each data center has redundant power, networking, and connectivity [c1]\n* Houses in separate facilities to ensure high availability and fault tolerance [c1]\n* Availability Zones are used to operate production applications and databases that require high availability and scalability [c1]\n* Multiple Availability Zones are located within an AWS Region [c1]",
+      "predicted": "An Availability Zone (AZ) is a discrete data center with redundant power, networking, and connectivity, housed in a separate facility [c1]. \n* It consists of one or more discrete data centers.\n* These data centers have redundant power, networking, and connectivity.\n* Availability Zones are housed in separate facilities.\n* They offer high availability, fault tolerance, and scalability for production applications and databases [c1].",
       "sources": [
         "aws-overview.pdf"
       ],
-      "llm_correctness": 0.8,
+      "llm_correctness": 0.9,
       "llm_relevance": 0.9,
-      "keyword_correctness": 0.8666666666666667,
+      "keyword_correctness": 0.7333333333333333,
       "keyword_relevance": 0.6666666666666666,
       "has_sources": 1.0,
-      "latency": 2.0542874336242676,
+      "latency": 2.0164945125579834,
       "success": true
     },
     {
       "id": "aws-q07",
       "question": "Why do multiple Availability Zones improve fault tolerance compared to a single data center?",
       "expected": "They are separate facilities with redundancy, enabling applications to survive failures affecting one data center/AZ.",
-      "predicted": "Multiple Availability Zones improve fault tolerance compared to a single data center because they consist of one or more discrete data centers, each with redundant power, networking, and connectivity, housed in separate facilities [c1]. \n\nHere are the key reasons:\n* Redundant power, networking, and connectivity in each data center\n* Housed in separate facilities to minimize the risk of a single point of failure\n* Allow for operating production applications and databases that are more highly available and fault-tolerant \n* Enable scalability, which is not possible with a single data center [c1].",
+      "predicted": "Multiple Availability Zones improve fault tolerance compared to a single data center because [c1]:\n* They consist of one or more discrete data centers, each with redundant power, networking, and connectivity, housed in separate facilities.\n* This setup allows for operating production applications and databases that are more highly available, fault-tolerant, and scalable than would be possible from a single data center. \n\nIn other words, if one data center in an Availability Zone experiences an outage, the other data centers in the same or different Availability Zones can continue to operate, reducing the risk of downtime and improving overall fault tolerance.",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 0.9,
       "llm_relevance": 0.9,
-      "keyword_correctness": 0.6,
+      "keyword_correctness": 0.5333333333333333,
       "keyword_relevance": 0.8333333333333334,
       "has_sources": 1.0,
-      "latency": 1.960585117340088,
+      "latency": 2.6511030197143555,
       "success": true
     },
     {
       "id": "aws-q08",
       "question": "Explain the AWS shared responsibility model in one or two sentences.",
       "expected": "AWS is responsible for security of the cloud; customers are responsible for security in the cloud (their configurations, data, apps, and access).",
-      "predicted": "The AWS shared responsibility model is a concept where AWS manages security of the cloud, while customers are responsible for security in the cloud [c1]. This means that customers retain control of the security they choose to implement to protect their own content, platform, applications, systems, and networks [c1].",
+      "predicted": "The AWS shared responsibility model is a concept where AWS manages security of the cloud, while customers are responsible for security in the cloud [c1]. This means customers retain control of the security they choose to implement to protect their own content, platform, applications, systems, and networks [c1].",
       "sources": [
         "aws-overview.pdf"
       ],
@@ -135,62 +135,62 @@
       "keyword_correctness": 0.6666666666666666,
       "keyword_relevance": 0.5,
       "has_sources": 1.0,
-      "latency": 1.863572120666504,
+      "latency": 1.97021484375,
       "success": true
     },
     {
       "id": "aws-q09",
       "question": "Scenario: A team says “AWS is responsible for securing our application code.” Is that correct under shared responsibility?",
       "expected": "No. Customers secure their applications/code and configurations; AWS secures underlying cloud infrastructure.",
-      "predicted": "* No, that's not correct under shared responsibility [c2].\n* According to AWS, you are responsible for security in the cloud, which includes securing your own content, platform, applications, systems, and networks [c2].\n* AWS is responsible for security of the cloud, but you retain control of the security you choose to implement to protect your own resources [c2].",
+      "predicted": "* No, that's not correct under shared responsibility [c2].\n* According to AWS, they are responsible for security of the cloud, but customers are responsible for security in the cloud [c1].\n* This means that the customer retains control of the security they choose to implement to protect their own content, platform, applications, systems, and networks [c2].",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 0.8,
       "llm_relevance": 0.9,
-      "keyword_correctness": 0.16666666666666666,
+      "keyword_correctness": 0.3333333333333333,
       "keyword_relevance": 0.4,
       "has_sources": 1.0,
-      "latency": 1.910780906677246,
+      "latency": 1.9259350299835205,
       "success": true
     },
     {
       "id": "aws-q10",
       "question": "Name three access methods to use AWS services mentioned in the overview.",
       "expected": "AWS Management Console, AWS CLI, SDKs.",
-      "predicted": "Here are three access methods to use AWS services mentioned in the overview [c3]:\n* AWS Management Console \n* AWS Command Line Interface (AWS CLI) \n* Software Development Kits (SDKs)",
+      "predicted": "Here are three access methods to use AWS services mentioned in the overview [c4]:\n* AWS Management Console, a simple and intuitive user interface\n* AWS Command Line Interface (AWS CLI), a unified tool to manage AWS services from the command line\n* Software Development Kits (SDKs), which simplify using AWS services in applications with an Application Program Interface (API) tailored to a specific programming language or platform. \n\nAdditionally, there is also AWS CloudShell, a browser-based shell that is pre-authenticated with console credentials [c4].",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 0.9,
       "llm_relevance": 0.9,
-      "keyword_correctness": 0.4,
+      "keyword_correctness": 0.6,
       "keyword_relevance": 0.8181818181818182,
       "has_sources": 1.0,
-      "latency": 1.987074375152588,
+      "latency": 2.1319375038146973,
       "success": true
     },
     {
       "id": "aws-q11",
       "question": "What is AWS CloudShell?",
       "expected": "A browser-based shell in the AWS console that is pre-authenticated to run AWS commands/scripts.",
-      "predicted": "AWS CloudShell is a browser-based shell that makes it easy to securely manage, explore, and interact with your AWS resources [c2]. \n* It is pre-authenticated with your console credentials [c2].\n* Common development and operations tools are pre-installed, so no local installation or configuration is required [c2].\n* You can quickly run scripts with the AWS Command Line Interface (AWS CLI), experiment with AWS service APIs using the AWS SDKs, or use a range of other tools to be productive [c2].\n* CloudShell can be accessed right from your browser and at no additional cost [c2].",
+      "predicted": "AWS CloudShell is a browser-based shell that makes it easy to securely manage, explore, and interact with your AWS resources [c2]. \n* It is pre-authenticated with your console credentials [c2].\n* Common development and operations tools are pre-installed, so no local installation or configuration is required [c2].\n* You can quickly run scripts with the AWS Command Line Interface (AWS CLI), experiment with AWS service APIs using the AWS SDKs, or use a range of other tools to be productive [c2].\n* CloudShell can be accessed right from your browser and at no additional cost [c2]. \n* It can be found next to the search bar in the AWS Management Console [c2].",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 0.9,
       "llm_relevance": 0.9,
-      "keyword_correctness": 0.8461538461538461,
+      "keyword_correctness": 0.9230769230769231,
       "keyword_relevance": 0.5,
       "has_sources": 1.0,
-      "latency": 2.1143674850463867,
+      "latency": 2.4934427738189697,
       "success": true
     },
     {
       "id": "aws-q12",
       "question": "Which statement best describes Amazon EC2? (A) Object storage (B) Virtual servers/compute instances (C) DNS service (D) Streaming ingestion",
       "expected": "B",
-      "predicted": "* The correct answer is (B) Virtual servers/compute instances [c1].\n* Amazon EC2 is described as a web service that provides secure, resizable compute capacity in the cloud, and is designed to make web-scale computing easier for developers [c1].\n* It allows users to obtain and configure capacity with minimal friction, and provides complete control of computing resources [c1].\n* This matches the description of virtual servers or compute instances [c2].",
+      "predicted": "* Amazon EC2 is described as a web service that provides secure, resizable compute capacity in the cloud [c1].\n* It allows users to obtain and configure capacity with minimal friction and provides complete control of computing resources [c1].\n* Amazon EC2 instance types are named based on their family, generation, processor family, additional capabilities, and size [c2].\n\nThe correct answer is: \n* (B) Virtual servers/compute instances \n\nThis is because Amazon EC2 is specifically designed to provide virtual servers or compute instances in the cloud, allowing users to run and manage their own virtual machines [c1][c2].",
       "sources": [
         "aws-overview.pdf"
       ],
@@ -199,14 +199,14 @@
       "keyword_correctness": 0.0,
       "keyword_relevance": 0.3333333333333333,
       "has_sources": 1.0,
-      "latency": 1.9675297737121582,
+      "latency": 3.1353251934051514,
       "success": true
     },
     {
       "id": "aws-q13",
       "question": "What is the purpose of Amazon EC2 Auto Scaling?",
       "expected": "Automatically adjusts the number of EC2 instances to meet demand and maintain performance/availability.",
-      "predicted": "* Amazon EC2 Auto Scaling helps maintain application availability and allows you to automatically add or remove EC2 instances according to conditions you define [c1].\n* It provides fleet management features to maintain the health and availability of your fleet [c1].\n* It offers dynamic and predictive scaling features to add or remove EC2 instances, where dynamic scaling responds to changing demand and predictive scaling automatically schedules the right number of EC2 instances based on predicted demand [c1].",
+      "predicted": "Amazon EC2 Auto Scaling helps you maintain application availability and allows you to automatically add or remove EC2 instances according to conditions you define [c1]. \n\nThe purposes of Amazon EC2 Auto Scaling include:\n* Maintaining the health and availability of your fleet [c1]\n* Automatically adding or removing EC2 instances in response to changing demand [c1]\n* Using dynamic scaling to respond to changing demand [c1]\n* Using predictive scaling to automatically schedule the right number of EC2 instances based on predicted demand [c1]",
       "sources": [
         "aws-overview.pdf"
       ],
@@ -215,55 +215,55 @@
       "keyword_correctness": 0.7692307692307693,
       "keyword_relevance": 0.6666666666666666,
       "has_sources": 1.0,
-      "latency": 1.96329927444458,
+      "latency": 3.5571694374084473,
       "success": true
     },
     {
       "id": "aws-q14",
       "question": "Which service is best described as “serverless functions”? (A) EC2 (B) Lambda (C) EBS (D) Route 53",
       "expected": "B",
-      "predicted": "* The correct answer is (B) Lambda [c1].\n* AWS Lambda is described as a service that \"lets you run code without provisioning or managing servers\" and \"you pay only for the compute time you consume\" [c1].\n* This matches the description of \"serverless functions\" [c1].\n* In contrast, EC2 is a service for virtual machines [c2], EBS is not mentioned in the provided context, and Route 53 is not mentioned at all.\n* Therefore, the best answer is (B) Lambda.",
+      "predicted": "* The correct answer is (B) Lambda [c1].\n* AWS Lambda is described as a service that \"lets you run code without provisioning or managing servers\" and \"you pay only for the compute time you consume\" [c1].\n* This matches the definition of \"serverless functions\" [c1].\n* In contrast, EC2 is a service for virtual machines [c2], EBS is not mentioned in the context as a relevant service, and Route 53 is not mentioned at all. \n* Therefore, the best answer is (B) Lambda.",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 0.9,
-      "llm_relevance": 1.0,
+      "llm_relevance": 0.9,
       "keyword_correctness": 0.0,
       "keyword_relevance": 0.6666666666666666,
       "has_sources": 1.0,
-      "latency": 2.049713134765625,
+      "latency": 3.165134906768799,
       "success": true
     },
     {
       "id": "aws-q15",
       "question": "Scenario: You want to run containers without managing servers. Which AWS compute option fits best?",
       "expected": "AWS Fargate (serverless container compute).",
-      "predicted": "To run containers without managing servers, the best AWS compute options are [c2][c5]:\n* **AWS Fargate**: A compute engine for Amazon ECS that allows you to run containers without having to manage servers or clusters. With AWS Fargate, you no longer have to provision, configure, and scale clusters of VMs to run containers [c2].\n* **AWS App Runner**: A fully managed service that can build and run containerized applications. With App Runner, you don't have to think about servers or scaling, allowing you to focus on your applications [c5]. \n\nBoth options remove the need for server management, but they serve slightly different purposes. AWS Fargate is specifically designed for containerized applications using Amazon ECS, while AWS App Runner provides a more comprehensive platform for building and running containerized applications. \n\nLet me know if you need more information.",
+      "predicted": "To run containers without managing servers, the best AWS compute option would be [c2][c1]:\n* AWS Fargate - a compute engine for Amazon ECS that allows you to run containers without having to manage servers or clusters [c2].\n* AWS App Runner - a fully managed service that can build and run containerized applications [c1].\n\nThese options remove the need for server management, allowing you to focus on designing and building your applications. \n\nWould you like to know more about the differences between these options?",
       "sources": [
         "aws-overview.pdf"
       ],
-      "llm_correctness": 0.8,
+      "llm_correctness": 0.9,
       "llm_relevance": 0.9,
       "keyword_correctness": 0.4,
-      "keyword_relevance": 0.5714285714285714,
+      "keyword_relevance": 0.6428571428571429,
       "has_sources": 1.0,
-      "latency": 2.147829532623291,
+      "latency": 3.0239951610565186,
       "success": true
     },
     {
       "id": "aws-q16",
       "question": "Which service is “object storage” on AWS? (A) EBS (B) EFS (C) S3 (D) FSx",
       "expected": "C",
-      "predicted": "* The correct answer is (C) S3.\n* Amazon Simple Storage Service (Amazon S3) is an object storage service that offers industry-leading scalability, data availability, security, and performance [c2].\n* This means customers of all sizes and industries can use it to store and protect any amount of data for a range of use cases, such as websites, mobile applications, backup and restore, archive, enterprise applications, IoT devices, and big data analytics [c2].",
+      "predicted": "* The correct answer is (C) S3.\n* Amazon Simple Storage Service (Amazon S3) is an object storage service that offers industry-leading scalability, data availability, security, and performance [c2].\n* This service allows customers to store and protect any amount of data for a range of use cases, such as websites, mobile applications, backup and restore, archive, enterprise applications, IoT devices, and big data analytics [c2].",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 1.0,
-      "llm_relevance": 0.9,
+      "llm_relevance": 1.0,
       "keyword_correctness": 0.0,
       "keyword_relevance": 0.15384615384615385,
       "has_sources": 1.0,
-      "latency": 2.060192108154297,
+      "latency": 3.3726933002471924,
       "success": true
     },
     {
@@ -279,14 +279,14 @@
       "keyword_correctness": 0.5833333333333334,
       "keyword_relevance": 0.4444444444444444,
       "has_sources": 1.0,
-      "latency": 4.255275726318359,
+      "latency": 3.183366298675537,
       "success": true
     },
     {
       "id": "aws-q18",
       "question": "What is Amazon RDS?",
       "expected": "A managed relational database service supporting multiple engines, handling provisioning/maintenance tasks.",
-      "predicted": "* Amazon RDS (Amazon Relational Database Service) is a service that makes it easy to set up, operate, and scale a relational database in the cloud [c2].\n* It provides cost-efficient and resizable capacity while automating time-consuming administration tasks such as hardware provisioning, database setup, patching, and backups [c2].\n* Amazon RDS supports six familiar database engines, including MySQL, MariaDB, PostgreSQL, Oracle Database, Microsoft SQL Server, and Amazon RDS on AWS Outposts [c2].\n* Additionally, there is also Amazon RDS for Db2, which makes it easy to set up, operate, and scale Db2 deployments in the cloud [c2]. \n* Another option is Amazon RDS on VMware, which lets you deploy managed databases in on-premises VMware environments using the Amazon RDS technology [c1].",
+      "predicted": "* Amazon RDS (Amazon Relational Database Service) is a service that makes it easy to set up, operate, and scale a relational database in the cloud [c2].\n* It provides cost-efficient and resizable capacity while automating time-consuming administration tasks such as hardware provisioning, database setup, patching, and backups [c2].\n* Amazon RDS supports six familiar database engines, including MySQL, MariaDB, PostgreSQL, Oracle Database, Microsoft SQL Server, and Amazon RDS on AWS Outposts [c2].\n* Additionally, there is also Amazon RDS for Db2, which makes it easy to set up, operate, and scale Db2 deployments in the cloud [c2].\n* Amazon RDS on VMware lets you deploy managed databases in on-premises VMware environments using the Amazon RDS technology [c1].",
       "sources": [
         "aws-overview.pdf"
       ],
@@ -295,14 +295,14 @@
       "keyword_correctness": 0.5454545454545454,
       "keyword_relevance": 0.5,
       "has_sources": 1.0,
-      "latency": 2.4258487224578857,
+      "latency": 3.62701416015625,
       "success": true
     },
     {
       "id": "aws-q19",
       "question": "Which database is commonly categorized as a managed NoSQL key-value/document database on AWS?",
       "expected": "Amazon DynamoDB.",
-      "predicted": "* Amazon DynamoDB — Fast, ﬂexible NoSQL database service for single-digit millisecond performance at any scale [c2][c4]\n* Amazon DynamoDB is a key-value and document database that delivers single-digit millisecond performance at any scale [c4]\n* Hundreds of thousands of AWS customers have chosen DynamoDB as their key-value and document database for mobile, web, gaming, ad tech, Internet of Things (IoT), and other applications that need low-latency data access at any scale [c2][c4]",
+      "predicted": "* Amazon DynamoDB — Fast, ﬂexible NoSQL database service for single-digit millisecond performance at any scale [c2][c4]\n* Hundreds of thousands of AWS customers have chosen DynamoDB as their key-value and document database for mobile, web, gaming, ad tech, Internet of Things (IoT), and other applications that need low-latency data access at any scale [c4]",
       "sources": [
         "aws-overview.pdf"
       ],
@@ -311,14 +311,14 @@
       "keyword_correctness": 0.5,
       "keyword_relevance": 0.3333333333333333,
       "has_sources": 1.0,
-      "latency": 2.0154836177825928,
+      "latency": 3.682649850845337,
       "success": true
     },
     {
       "id": "aws-q20",
       "question": "What is Amazon VPC used for?",
       "expected": "Provision a logically isolated virtual network in AWS with control over IP ranges, subnets, routing, and gateways.",
-      "predicted": "Amazon VPC (Amazon Virtual Private Cloud) is used for [c1]:\n* Provisioning a logically isolated section of the AWS Cloud where you can launch AWS resources in a virtual network that you define.\n* Having complete control over your virtual networking environment, including selection of your own IP address range, creation of subnets, and configuration of route tables and network gateways.\n* Customizing the network configuration for your VPC, such as creating a public-facing subnet for your web servers and a private-facing subnet for your backend systems.\n* Leveraging multiple layers of security, including security groups and network access control lists, to help control access to EC2 instances in each subnet.\n* Creating a hardware virtual private network (VPN) connection between your corporate data center and your VPC, and leveraging the AWS Cloud as an extension of your corporate data center.",
+      "predicted": "Amazon VPC is used for [c1]:\n* Provisioning a logically isolated section of the AWS Cloud where you can launch AWS resources in a virtual network that you define.\n* Having complete control over your virtual networking environment, including selection of your own IP address range, creation of subnets, and configuration of route tables and network gateways.\n* Using both IPv4 and IPv6 in your VPC for secure and easy access to resources and applications.\n* Customizing the network configuration for your VPC, such as creating a public-facing subnet for your web servers and a private-facing subnet for your backend systems.\n* Creating a hardware virtual private network (VPN) connection between your corporate data center and your VPC.",
       "sources": [
         "aws-overview.pdf"
       ],
@@ -327,7 +327,7 @@
       "keyword_correctness": 0.7647058823529411,
       "keyword_relevance": 0.75,
       "has_sources": 1.0,
-      "latency": 2.1215524673461914,
+      "latency": 2.1368634700775146,
       "success": true
     },
     {
@@ -343,14 +343,14 @@
       "keyword_correctness": 0.6,
       "keyword_relevance": 0.8666666666666667,
       "has_sources": 1.0,
-      "latency": 2.1689696311950684,
+      "latency": 2.257791042327881,
       "success": true
     },
     {
       "id": "aws-q22",
       "question": "What is Elastic Load Balancing (ELB) used for?",
       "expected": "Distributes incoming traffic across multiple targets (instances/containers/IPs) across AZs for high availability and scaling.",
-      "predicted": "Elastic Load Balancing (ELB) is used for:\n* Automatically distributing incoming application traffic across multiple targets, such as Amazon EC2 instances, containers, and IP addresses [c1].\n* Handling the varying load of application traffic in a single Availability Zone or across multiple Availability Zones [c1].\n* ELB offers four types of load balancers that feature high availability, automatic scaling, and robust security [c1]. \n* Specifically, Application Load Balancer is best suited for load balancing of HTTP and HTTPS traffic and provides advanced request routing [c1].",
+      "predicted": "Elastic Load Balancing (ELB) is used for [c1]:\n* Automatically distributing incoming application traffic across multiple targets, such as:\n  * Amazon EC2 instances\n  * Containers\n  * IP addresses\n* Handling varying loads of application traffic in a single Availability Zone or across multiple Availability Zones.\n* ELB offers four types of load balancers that feature high availability, automatic scaling, and robust security to make applications fault-tolerant.\n* Specifically, Application Load Balancer is best suited for load balancing of HTTP and HTTPS traffic and provides advanced request routing [c1].",
       "sources": [
         "aws-overview.pdf"
       ],
@@ -359,71 +359,71 @@
       "keyword_correctness": 0.6153846153846154,
       "keyword_relevance": 0.8333333333333334,
       "has_sources": 1.0,
-      "latency": 2.0426855087280273,
+      "latency": 2.236847162246704,
       "success": true
     },
     {
       "id": "aws-q23",
       "question": "Which load balancer is best suited for HTTP/HTTPS with content-based routing?",
       "expected": "Application Load Balancer.",
-      "predicted": "• Application Load Balancer is best suited for load balancing of HTTP and HTTPS traffic and provides advanced request routing targeted at the delivery of modern application architectures, including microservices and containers [c2].",
+      "predicted": "The Application Load Balancer is best suited for load balancing of HTTP and HTTPS traffic and provides advanced request routing targeted at the delivery of modern application architectures, including microservices and containers [c2]. \n\nThis is because it operates at the individual request level (Layer seven) and routes traffic to targets within Amazon Virtual Private Cloud (Amazon VPC) based on the content of the request [c2]. \n\nSo, the answer is:\n* Application Load Balancer.",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 0.9,
       "llm_relevance": 0.9,
-      "keyword_correctness": 0.6666666666666666,
+      "keyword_correctness": 1.0,
       "keyword_relevance": 0.5555555555555556,
       "has_sources": 1.0,
-      "latency": 2.861145257949829,
+      "latency": 2.9901857376098633,
       "success": true
     },
     {
       "id": "aws-q24",
       "question": "What is Amazon CloudFront?",
       "expected": "A CDN service that securely delivers content with low latency and high transfer speeds using the AWS global network.",
-      "predicted": "Amazon CloudFront is a fast content delivery network (CDN) service that securely delivers data, videos, applications, and APIs to customers globally with low latency, high transfer speeds, all within a developer-friendly environment [c3]. \n* It works seamlessly with services including AWS Shield for DDoS mitigation, Amazon S3, Elastic Load Balancing or Amazon EC2 as origins for applications, and Lambda@Edge to run custom code closer to customers’ users and to customize the user experience [c2].\n* It offers a simple, pay-as-you-go pricing model with no upfront fees or required long-term contracts, and support for the CDN is included in existing AWS Support subscriptions [c2].\n* It is integrated with AWS – both physical locations that are directly connected to the AWS global infrastructure [c3].",
+      "predicted": "Amazon CloudFront is a fast content delivery network (CDN) service that securely delivers data, videos, applications, and APIs to customers globally with low latency, high transfer speeds, all within a developer-friendly environment [c3]. \n* It works seamlessly with other AWS services, including AWS Shield for DDoS mitigation, Amazon S3, Elastic Load Balancing, or Amazon EC2 as origins for applications, and Lambda@Edge to run custom code closer to customers’ users [c2].\n* It offers a simple, pay-as-you-go pricing model with no upfront fees or required long-term contracts [c2].\n* It is integrated with AWS, both physical locations that are directly connected to the AWS global infrastructure [c3].",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 0.9,
       "llm_relevance": 0.9,
-      "keyword_correctness": 0.7894736842105263,
+      "keyword_correctness": 0.7368421052631579,
       "keyword_relevance": 0.5,
       "has_sources": 1.0,
-      "latency": 2.1613047122955322,
+      "latency": 7.114807367324829,
       "success": true
     },
     {
       "id": "aws-q25",
       "question": "What does Amazon Route 53 provide at a high level?",
       "expected": "DNS and traffic routing for domains/applications.",
-      "predicted": "Amazon Route 53 is a highly available and scalable cloud Domain Name System (DNS) web service [c2]. \nAt a high level, it provides:\n* A way to route users to internet applications by translating human-readable names into numeric IP addresses [c2].\n* The ability to connect user requests to infrastructure running in AWS, such as EC2 instances, elastic load balancers, or Amazon S3 buckets [c2].\n* The ability to route users to infrastructure outside of AWS [c2].\n* DNS health checks to route traffic to healthy endpoints or to independently monitor the health of an application and its endpoints [c2].",
+      "predicted": "* A highly available and scalable cloud Domain Name System (DNS) web service [c2].\n* A way to route users to internet applications by translating human-readable names into numeric IP addresses [c2].\n* Support for IPv6 [c2].\n* Ability to connect user requests to infrastructure running in AWS or outside of AWS [c2].\n* DNS health checks to route traffic to healthy endpoints [c2].\n* Traffic management through a variety of routing types, including latency-based routing, Geo DNS, and weighted round robin [c1].",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 0.9,
       "llm_relevance": 0.9,
-      "keyword_correctness": 0.5,
-      "keyword_relevance": 0.625,
+      "keyword_correctness": 0.8333333333333334,
+      "keyword_relevance": 0.125,
       "has_sources": 1.0,
-      "latency": 2.105794668197632,
+      "latency": 3.2578864097595215,
       "success": true
     },
     {
       "id": "aws-q26",
       "question": "What is AWS Direct Connect used for?",
       "expected": "Dedicated private network connectivity between on-premises and AWS to reduce costs/increase bandwidth and consistency.",
-      "predicted": "* Establishing a dedicated network connection from your premises to AWS [c1]\n* Providing private connectivity between AWS and your data center, office, or co-location environment [c1]\n* Reducing network costs [c1]\n* Increasing bandwidth throughput [c1]\n* Providing a more consistent network experience than Internet-based connections [c1]\n* Allowing the use of the same connection to access public resources (e.g., Amazon S3) and private resources (e.g., EC2 instances) while maintaining network separation [c1]",
+      "predicted": "AWS Direct Connect is used for:\n* Establishing a dedicated network connection from your premises to AWS [c1]\n* Providing private connectivity between AWS and your data center, office, or co-location environment [c1]\n* Reducing network costs [c1]\n* Increasing bandwidth throughput [c1]\n* Providing a more consistent network experience than Internet-based connections [c1]\n* Allowing the connection to be partitioned into multiple virtual interfaces using industry standard 802.1Q virtual LANs (VLANs) [c1]\n* Enabling access to public resources (e.g., Amazon S3) and private resources (e.g., EC2 instances) while maintaining network separation [c1]",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 0.9,
-      "llm_relevance": 1.0,
+      "llm_relevance": 0.9,
       "keyword_correctness": 0.6923076923076923,
-      "keyword_relevance": 0.2,
+      "keyword_relevance": 0.8,
       "has_sources": 1.0,
-      "latency": 3.066160202026367,
+      "latency": 3.448885202407837,
       "success": true
     },
     {
@@ -439,7 +439,7 @@
       "keyword_correctness": 0.6666666666666666,
       "keyword_relevance": 0.42857142857142855,
       "has_sources": 1.0,
-      "latency": 1.873155117034912,
+      "latency": 3.0471062660217285,
       "success": true
     },
     {
@@ -455,30 +455,30 @@
       "keyword_correctness": 0.25,
       "keyword_relevance": 0.4,
       "has_sources": 1.0,
-      "latency": 1.8758275508880615,
+      "latency": 3.636871814727783,
       "success": true
     },
     {
       "id": "aws-q29",
       "question": "What is AWS IAM used for?",
       "expected": "Identity and access management for controlling permissions to AWS resources.",
-      "predicted": "AWS IAM (Identity and Access Management) is used for:\n* Securely controlling access to AWS services and resources [c2]\n* Creating and managing fine-grained access controls with permissions [c2]\n* Specifying who can access which services and resources, and under which conditions [c2]\n* Managing user access across multiple AWS accounts using IAM Identity Center [c3]\n* Delegating access to users or services that normally don’t have access to your organization’s AWS resources using IAM roles [c3]",
+      "predicted": "Here are the uses of AWS IAM [c3]:\n\n* Securely control access to AWS services and resources for your AWS users, groups, and roles [c2]\n* Create and manage fine-grained access controls with permissions [c3]\n* Specify who can access which services and resources, and under which conditions [c3]\n* Manage single-account IAM permissions [c3]\n* Manage single-account IAM roles, allowing you to delegate access to users or services that normally don’t have access to your organization’s AWS resources [c3]",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 0.9,
       "llm_relevance": 0.9,
-      "keyword_correctness": 0.7,
-      "keyword_relevance": 0.75,
+      "keyword_correctness": 0.6,
+      "keyword_relevance": 0.5,
       "has_sources": 1.0,
-      "latency": 1.9823479652404785,
+      "latency": 3.1375796794891357,
       "success": true
     },
     {
       "id": "aws-q30",
       "question": "Scenario: You need centralized access management for multiple AWS accounts. Which IAM-related service is relevant?",
       "expected": "AWS IAM Identity Center (for centralized workforce access across accounts/apps).",
-      "predicted": "To manage centralized access for multiple AWS accounts, the relevant IAM-related services are:\n* AWS IAM Identity Center (IAM Identity Center), which allows you to centrally manage single sign-on (SSO) access to multiple AWS accounts and business applications [c1][c2].\n \nAWS IAM Identity Center provides a user portal where users can sign in with their configured credentials or existing corporate credentials to access all their assigned accounts and applications from one place [c1][c2].\n\nAdditionally, you can also consider:\n* AWS Resource Access Manager (AWS RAM), which helps you securely share resources across AWS accounts [c3]. \n\nHowever, for centralized access management specifically, AWS IAM Identity Center is the most directly relevant service. [c1][c2]",
+      "predicted": "To manage centralized access for multiple AWS accounts, the relevant IAM-related services are:\n* AWS IAM Identity Center (IAM Identity Center), which allows you to centrally manage single sign-on (SSO) access to multiple AWS accounts and business applications [c1][c2].\n \nAWS IAM Identity Center provides a user portal where users can access all their assigned accounts and applications from one place, using credentials they configure or their existing corporate credentials [c1][c2].\n\nAdditionally, you can also consider:\n* AWS Resource Access Manager (AWS RAM), which helps you securely share resources across AWS accounts [c3]. \n\nHowever, for centralized access management specifically, AWS IAM Identity Center seems more directly relevant. \n\nLet me know if I can help with anything else!",
       "sources": [
         "aws-overview.pdf"
       ],
@@ -487,14 +487,14 @@
       "keyword_correctness": 0.7,
       "keyword_relevance": 0.6153846153846154,
       "has_sources": 1.0,
-      "latency": 2.0429933071136475,
+      "latency": 3.1129791736602783,
       "success": true
     },
     {
       "id": "aws-q31",
       "question": "What is Amazon CloudWatch used for?",
       "expected": "Monitoring and observability (metrics, logs, alarms) for AWS resources and applications.",
-      "predicted": "Amazon CloudWatch is used for [c1]:\n* Monitoring and management of applications, systems, and resources \n* Collecting monitoring and operational data in the form of logs, metrics, and events \n* Providing a unified view of operational health \n* Setting high-resolution alarms \n* Visualizing logs and metrics \n* Taking automated actions \n* Troubleshooting issues \n* Discovering insights to optimize applications and ensure they are running smoothly.",
+      "predicted": "Amazon CloudWatch is used for [c1]:\n* Monitoring and management of applications, allowing users to monitor their applications and understand and respond to system-wide performance changes [c1].\n* Collecting monitoring and operational data in the form of logs, metrics, and events to provide a unified view of AWS resources, applications, and services [c1].\n* Setting high-resolution alarms, visualizing logs and metrics, taking automated actions, troubleshooting issues, and discovering insights to optimize applications [c1].",
       "sources": [
         "aws-overview.pdf"
       ],
@@ -503,30 +503,30 @@
       "keyword_correctness": 0.5,
       "keyword_relevance": 0.75,
       "has_sources": 1.0,
-      "latency": 1.893798828125,
+      "latency": 3.1931142807006836,
       "success": true
     },
     {
       "id": "aws-q32",
       "question": "What is AWS CloudTrail used for?",
       "expected": "Records API activity/events for auditing, governance, and troubleshooting.",
-      "predicted": "Here are the uses of AWS CloudTrail [c2][c3]:\n* Records AWS API calls for your account and delivers log files to you, including information such as the identity of the API caller, the time of the API call, the source IP address of the API caller, the request parameters, and the response elements returned by the AWS service [c2].\n* Provides a history of AWS API calls for your account, including API calls made using the AWS Management Console, AWS SDKs, command line tools, and higher-level AWS services [c2].\n* Enables security analysis, resource change tracking, and compliance auditing through its API call history [c3].\n* Can deliver log files to Amazon S3 or Amazon CloudWatch Logs [c2].",
+      "predicted": "Here are the uses of AWS CloudTrail [c2][c5]:\n* Records AWS API calls for your account and delivers log files to you [c2]\n* Provides a history of AWS API calls for your account, including API calls made using the AWS Management Console, AWS SDKs, command line tools, and higher-level AWS services [c2]\n* Enables security analysis, resource change tracking, and compliance auditing [c2]\n* Used in conjunction with AWS Key Management Service (AWS KMS) to provide logs of all key usage to help meet regulatory and compliance needs [c4]",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 0.9,
       "llm_relevance": 0.9,
       "keyword_correctness": 0.5,
-      "keyword_relevance": 0.5,
+      "keyword_relevance": 0.75,
       "has_sources": 1.0,
-      "latency": 2.1241953372955322,
+      "latency": 2.042280435562134,
       "success": true
     },
     {
       "id": "aws-q33",
       "question": "What does AWS Config provide?",
       "expected": "Resource inventory, configuration history, and change notifications; rules for compliance checking.",
-      "predicted": "Here are the details on what AWS Config provides [c1]:\n* An AWS resource inventory \n* Configuration history \n* Configuration change notifications \n* The ability to create rules that automatically check the configuration of AWS resources \n* The ability to discover existing and deleted AWS resources \n* The ability to determine overall compliance against rules \n* The ability to view configuration details of a resource at any point in time \n\nThese capabilities enable [c1]:\n* Compliance auditing \n* Security analysis \n* Resource change tracking \n* Troubleshooting",
+      "predicted": "Here are the features provided by AWS Config [c1]:\n* An AWS resource inventory \n* Configuration history \n* Configuration change notifications \n* The ability to create rules that automatically check the configuration of AWS resources (AWS Config Rules) \n* The ability to discover existing and deleted AWS resources \n* The ability to determine overall compliance against rules \n* The ability to view configuration details of a resource at any point in time \n\nThese capabilities enable [c1]:\n* Compliance auditing \n* Security analysis \n* Resource change tracking \n* Troubleshooting",
       "sources": [
         "aws-overview.pdf"
       ],
@@ -535,14 +535,14 @@
       "keyword_correctness": 0.5454545454545454,
       "keyword_relevance": 0.5,
       "has_sources": 1.0,
-      "latency": 2.049544095993042,
+      "latency": 2.082002878189087,
       "success": true
     },
     {
       "id": "aws-q34",
       "question": "Which service helps reduce cost, increase performance, and improve security using best-practice checks?",
       "expected": "AWS Trusted Advisor.",
-      "predicted": "* AWS Trusted Advisor helps reduce cost, increase performance, and improve security by optimizing your AWS environment using best-practice checks [c4].\n* AWS Trusted Advisor provides real-time guidance to help you provision your resources following AWS best practices [c1]. \n* Additionally, AWS Security Hub also provides automated security best practice checks powered by AWS Config rules [c2].",
+      "predicted": "* AWS Trusted Advisor helps reduce cost, increase performance, and improve security by optimizing your AWS environment using best-practice checks [c1][c4].\n* AWS Trusted Advisor provides real-time guidance to help you provision your resources following AWS best practices [c1][c4]. \n* Additionally, AWS Security Hub also provides automated security best practice checks powered by AWS Config rules [c2][c5].",
       "sources": [
         "aws-overview.pdf"
       ],
@@ -551,23 +551,23 @@
       "keyword_correctness": 0.6666666666666666,
       "keyword_relevance": 0.8333333333333334,
       "has_sources": 1.0,
-      "latency": 1.806145191192627,
+      "latency": 2.089210271835327,
       "success": true
     },
     {
       "id": "aws-q35",
       "question": "What is the AWS Well-Architected Tool used for?",
       "expected": "Assess workloads via questions across pillars (operational excellence, security, reliability, performance efficiency, cost optimization, sustainability) and get improvement guidance.",
-      "predicted": "The AWS Well-Architected Tool is used for:\n* Reviewing the state of your workloads and comparing them to the latest AWS architectural best practices [c2].\n* Evaluating architectures using the AWS Well-Architected Framework, which provides a consistent approach for customers and partners to evaluate architectures [c2].\n* Providing specialized guidance for various types of applications, such as serverless applications, SaaS workloads, government services, and more [c4].\n* Helping you understand the pros and cons of the decisions you make when building systems on AWS [c2].\n* Reviewing your workloads against best practices by answering a set of questions for each pillar, available at no charge in the AWS Management Console [c2].",
+      "predicted": "The AWS Well-Architected Tool is used for [c2][c5]:\n* Reviewing the state of your workloads and comparing them to the latest AWS architectural best practices.\n* Evaluating architectures using the AWS Well-Architected Framework, which provides a consistent approach for customers and partners to evaluate architectures.\n* Providing guidance to help implement designs that scale with application needs over time.\n* Reviewing workloads against best practices by answering a set of questions for each pillar, including operational excellence, security, reliability, performance efficiency, cost optimization, and sustainability.\n* Providing a plan on how to architect for the cloud using established best practices. \n\nThe tool is available at no charge in the AWS Management Console [c2].",
       "sources": [
         "aws-overview.pdf"
       ],
       "llm_correctness": 0.9,
       "llm_relevance": 0.9,
-      "keyword_correctness": 0.15789473684210525,
+      "keyword_correctness": 0.5263157894736842,
       "keyword_relevance": 0.8,
       "has_sources": 1.0,
-      "latency": 2.1406002044677734,
+      "latency": 3.5992841720581055,
       "success": true
     },
     {
@@ -578,19 +578,19 @@
       "sources": [
         "aws-overview.pdf"
       ],
-      "llm_correctness": 0.8,
+      "llm_correctness": 0.9,
       "llm_relevance": 0.9,
       "keyword_correctness": 0.7333333333333333,
       "keyword_relevance": 0.5,
       "has_sources": 1.0,
-      "latency": 2.1631171703338623,
+      "latency": 2.1339099407196045,
       "success": true
     },
     {
       "id": "aws-q37",
       "question": "Scenario: You want near real-time ingestion of streaming data into S3/Redshift/OpenSearch with minimal ops. Which service fits?",
       "expected": "Amazon Kinesis Data Firehose.",
-      "predicted": "* Amazon Kinesis Data Firehose is the service that fits your scenario. It can capture, transform, and load streaming data into Amazon S3, Amazon Redshift, Amazon OpenSearch Service, and Splunk, enabling near real-time analytics with existing business intelligence tools and dashboards [c2].\n* With Firehose, you can easily create a delivery stream from the AWS Management Console, configure it with a few clicks, and start sending data to the stream from hundreds of thousands of data sources to be loaded continuously to AWS [c2].\n* Firehose is a fully managed service that automatically scales to match the throughput of your data and requires no ongoing administration [c2]. \n* Additionally, Firehose can batch, compress, transform, and encrypt the data before loading it, minimizing the amount of storage used at the destination and increasing security [c2]. \n* It can also automatically convert incoming data to columnar formats such as Apache Parquet and Apache ORC before delivering it to Amazon S3 [c2].",
+      "predicted": "* Amazon Kinesis Data Firehose is the service that fits your scenario. It can capture, transform, and load streaming data into Amazon S3, Amazon Redshift, Amazon OpenSearch Service, and Splunk, enabling near real-time analytics with existing business intelligence tools and dashboards [c2].\n* With Firehose, you can easily create a delivery stream from the AWS Management Console, configure it with a few clicks, and start sending data to the stream from hundreds of thousands of data sources to be loaded continuously to AWS—all in just a few minutes [c2].\n* It is a fully managed service that automatically scales to match the throughput of your data and requires no ongoing administration [c2]. \n* Additionally, Firehose can batch, compress, transform, and encrypt the data before loading it, minimizing the amount of storage used at the destination and increasing security [c2]. \n* It can also automatically convert incoming data to columnar formats such as Apache Parquet and Apache ORC before delivering it to Amazon S3 for cost-effective storage and analytics [c2].",
       "sources": [
         "aws-overview.pdf"
       ],
@@ -599,7 +599,7 @@
       "keyword_correctness": 0.75,
       "keyword_relevance": 0.5625,
       "has_sources": 1.0,
-      "latency": 2.3455469608306885,
+      "latency": 2.8309500217437744,
       "success": true
     },
     {
@@ -615,14 +615,14 @@
       "keyword_correctness": 0.6,
       "keyword_relevance": 0.6666666666666666,
       "has_sources": 1.0,
-      "latency": 2.119335889816284,
+      "latency": 3.055891990661621,
       "success": true
     },
     {
       "id": "aws-q39",
       "question": "What is AWS Organizations used for?",
       "expected": "Centralized multi-account management and governance (account grouping, policies, consolidated billing).",
-      "predicted": "Here are the uses of AWS Organizations [c5][c1]:\n* Centrally manage and govern your environment as you grow and scale your AWS resources\n* Programmatically create new AWS accounts and allocate resources\n* Group accounts to organize your workflows\n* Apply policies to accounts or groups for governance\n* Simplify billing by using a single payment method for all of your accounts\n* Define central configurations, security mechanisms, audit requirements, and resource sharing across accounts in your organization. \n\nAWS Organizations is available to all AWS customers at no additional charge [c1].",
+      "predicted": "* AWS Organizations is available to all AWS customers at no additional charge [c1].\n* It helps you centrally govern and enforce the best use of AWS services across all the accounts in your environment [c3].\n* AWS Organizations allows you to create administrative or billing isolation, and to limit the impact of errors by using multiple accounts [c2].\n* Amazon Detective also uses AWS Organizations to simplify account management for security operations and investigations across all existing and future accounts in an organization, supporting up to 1,200 AWS accounts [c5].",
       "sources": [
         "aws-overview.pdf"
       ],
@@ -631,23 +631,23 @@
       "keyword_correctness": 0.2,
       "keyword_relevance": 0.5,
       "has_sources": 1.0,
-      "latency": 1.8923842906951904,
+      "latency": 1.9197049140930176,
       "success": true
     },
     {
       "id": "aws-q40",
       "question": "What is AWS Control Tower designed to set up?",
       "expected": "A secure, well-architected multi-account landing zone with baseline governance and guardrails.",
-      "predicted": "AWS Control Tower is designed to set up a baseline environment, or landing zone, that is a secure, well-architected multi-account AWS environment [c2]. \n* It automates the set-up of this landing zone and configures AWS management and security services based on established best practices [c1].\n* The configuration of the landing zone is based on best practices established by working with thousands of enterprise customers [c2]. \n* This allows enterprises to create a secure environment that makes it easier to govern AWS workloads with rules for security, operations, and compliance [c2].",
+      "predicted": "* A secure, well-architected multi-account AWS environment, also known as a landing zone [c2].\n* The setup is based on established best practices for security, operations, and compliance [c2].\n* It automates the configuration of AWS management and security services, such as AWS Organizations, Service Catalog, and AWS Config [c1].",
       "sources": [
         "aws-overview.pdf"
       ],
-      "llm_correctness": 0.9,
+      "llm_correctness": 0.8,
       "llm_relevance": 0.9,
-      "keyword_correctness": 0.8181818181818182,
-      "keyword_relevance": 0.8571428571428571,
+      "keyword_correctness": 0.6363636363636364,
+      "keyword_relevance": 0.14285714285714285,
       "has_sources": 1.0,
-      "latency": 1.9892044067382812,
+      "latency": 3.2954297065734863,
       "success": true
     }
   ]
