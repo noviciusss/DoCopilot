@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .rag import (
-    ask_question,
+    query_document,
     index_get_pdf,
     index_get_txt,
     index_get_plain_text,
@@ -48,6 +48,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer:str
     sources :list[str]
+    blocked: bool = False
     
 # UploadField = Annotated[UploadFile | None, File(None)]
 # PlainTextField = Annotated[str | None, Form()]
@@ -100,9 +101,14 @@ async def upload_document(
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest) -> ChatResponse:
     try:
-        answer, sources = ask_question(
-            question=request.question,
+        result = await query_document(
             document_id=request.document_id,
+            question=request.question,
+        )
+        return ChatResponse(
+            answer=result["answer"],
+            sources=result.get("sources", []),
+            blocked=result.get("blocked", False),
         )
     except ValueError as exc:
         raise HTTPException(
@@ -115,4 +121,3 @@ async def chat(request: ChatRequest) -> ChatResponse:
             status_code=500,
             detail="An unexpected error occurred during chat processing.",
         ) from exc
-    return ChatResponse(answer=answer, sources=sources)

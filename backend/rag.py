@@ -28,6 +28,9 @@ from sentence_transformers import CrossEncoder
 from langchain_qdrant import QdrantVectorStore, RetrievalMode, FastEmbedSparse
 from qdrant_client import QdrantClient
 
+###Basic guadrail functions 
+from backend.ragguardrails import RagGuardrails
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -374,6 +377,32 @@ Answer (bullets):
 
     return answer, sources
 
+# ============================================
+async def query_document(document_id: str , question :str)->dict:
+    """Query a document with guradrails checks
+    """
+    ##input check
+    is_safe,message = RagGuardrails.check_input(question)
+    if not is_safe:
+        return {"answer": message,
+                "blocked":True,
+                "sources":[]}
+
+    try : 
+        answer,sources = ask_question(question,document_id=document_id)
+        _,cleaned_answer = RagGuardrails.check_output(answer,sources)
+        
+        return {"answer":cleaned_answer,
+                "blocked":False,
+                "sources":sources}
+    except Exception as e:
+        logger.error("Query failed: %s", str(e))
+        return {
+            "answer":  f"Error processing the query: {str(e)}",
+            "blocked": False,
+            "sources": []
+        }
+            
 
 # ============================================
 # QDRANT UTILITY FUNCTIONS
