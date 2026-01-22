@@ -39,9 +39,8 @@ The UI calls the backend at `http://localhost:8000` by default. Override with `N
 
 ---
 
-## Guardrails
-
-DoCopilot includes custom lightweight guardrails for enterprise safety and compliance.
+<details>
+<summary><strong>Guardrails (Safety and Compliance)</strong></summary>
 
 ### What Are Guardrails?
 
@@ -51,10 +50,10 @@ Safety mechanisms that validate, filter, and control inputs/outputs in the RAG p
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| **Prompt Injection Detection** | Blocks attempts to override system instructions | ✅ Active |
-| **PII Redaction** | Removes credit cards, emails, phone numbers from output | ✅ Active |
-| **Input Length Validation** | Rejects queries > 2000 chars or < 3 chars | ✅ Active |
-| **Source Grounding Warning** | Warns if response has no sources | ✅ Active |
+| **Prompt Injection Detection** | Blocks attempts to override system instructions | Active |
+| **PII Redaction** | Removes credit cards, emails, phone numbers from output | Active |
+| **Input Length Validation** | Rejects queries > 2000 chars or < 3 chars | Active |
+| **Source Grounding Warning** | Warns if response has no sources | Active |
 
 ### Blocked Patterns
 
@@ -94,7 +93,20 @@ Safety mechanisms that validate, filter, and control inputs/outputs in the RAG p
 }
 ```
 
-### Architecture with Guardrails
+### Why Guardrails Matter
+
+| Risk | Without Guardrails | With Guardrails |
+|------|-------------------|-----------------|
+| Prompt Injection | LLM follows malicious instructions | Blocked at input |
+| PII Leakage | Sensitive data in responses | Auto-redacted |
+| Off-topic Queries | Wasted compute | Can be filtered |
+| Hallucination | Ungrounded answers | Warning added |
+
+</details>
+
+---
+
+## Architecture with Guardrails
 
 ```
 User Query
@@ -325,18 +337,6 @@ Query: "What is EC2 pricing?"
 
 </details>
 
-<details>
-<summary><strong>Why Guardrails Matter</strong></summary>
-
-| Risk | Without Guardrails | With Guardrails |
-|------|-------------------|-----------------|
-| Prompt Injection | LLM follows malicious instructions | Blocked at input |
-| PII Leakage | Sensitive data in responses | Auto-redacted |
-| Off-topic Queries | Wasted compute | Can be filtered |
-| Hallucination | Ungrounded answers | Warning added |
-
-</details>
-
 ### Evaluation Methods Comparison
 
 | Method | How it works | Pros | Cons |
@@ -380,13 +380,13 @@ Query: "What is EC2 pricing?"
 
 | Week | Change | Status |
 |------|--------|--------|
-| 1 | Baseline v1 + eval | ✅ Done |
-| 2 | Chunking ablation + LLM eval | ✅ Done |
-| 3 | Reranking | ✅ Done |
-| 4 | Hybrid retrieval (BM25 + Vector + RRF) | ✅ Done |
-| 5 | Vector DB swap (Qdrant) | ✅ Done |
-| 6 | Final report + ablation table | ✅ Done |
-| 7 | **Guardrails (safety + PII)** | ✅ Done |
+| 1 | Baseline v1 + eval | Done |
+| 2 | Chunking ablation + LLM eval | Done |
+| 3 | Reranking | Done |
+| 4 | Hybrid retrieval (BM25 + Vector + RRF) | Done |
+| 5 | Vector DB swap (Qdrant) | Done |
+| 6 | Final report + ablation table | Done |
+| 7 | Guardrails (safety + PII) | Done |
 
 </details>
 
@@ -420,7 +420,6 @@ Query: "What is EC2 pricing?"
 | Multi-modal RAG | Extract info from images/tables in PDFs | Technical documents |
 | Caching Layer | Cache frequent queries | Cost reduction, speed |
 | RAGAS Evaluation | More comprehensive eval metrics | Faithfulness, context relevance |
-| ~~Guardrails~~ | ~~Safety filters, PII detection~~ | ~~Enterprise compliance~~ ✅ **Implemented** |
 | Toxicity Detection | Block harmful content generation | Content safety |
 | Fact-checking | Verify claims against sources | Reduce hallucinations |
 
@@ -445,8 +444,8 @@ Query: "What is EC2 pricing?"
 - Embeddings preload on server start for faster indexing after the first request.
 - Run `python evaluate_local.py` in `backend/` to reproduce evaluation results.
 - LLM-as-Judge uses a different model (`llama-3.1-8b`) than RAG to avoid self-bias.
-- **Guardrails** run on every `/chat` request automatically.
-- **Conclusion**: Qdrant hybrid search + Guardrails provides best quality with enterprise safety.
+- Guardrails run on every `/chat` request automatically.
+- Conclusion: Qdrant hybrid search + Guardrails provides best quality with enterprise safety.
 
 ## License
 
