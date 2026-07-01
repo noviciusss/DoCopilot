@@ -1,26 +1,27 @@
 # DoCopilot
 
-A Next.js + FastAPI RAG app: upload PDFs or text, embed them into Qdrant (hybrid search), and chat with sourced answers. LangSmith is available for tracing.
+A Next.js + FastAPI RAG app: upload PDFs, TXT files, or paste text — embed into Qdrant (hybrid search), chat with streamed answers and source citations. LangSmith optional for tracing.
 
 
 ## Prerequisites
-- Python 3.10+ with pip or conda
+- Python 3.11+
 - Node.js 18+
-- Groq API key for LLM
+- Groq API key ([console.groq.com](https://console.groq.com))
+- Qdrant Cloud account — or run locally (see below)
 - (Optional) LangSmith API key for tracing
 
 ## Backend Setup
 ```bash
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+# From the project root (important — keeps module paths correct)
+pip install -r backend/requirements.txt
+uvicorn backend.main:app --reload --port 8000
 ```
-Environment (place in `.env`, do not commit):
+Environment variables (copy `.env.example` → `.env`, do not commit):
 ```
-GROQ_API_KEY=your_key
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=your_langsmith_key
-LANGCHAIN_PROJECT=DoCopilot
+GROQ_API_KEY=gsk_...
+QDRANT_URL=https://your-cluster.cloud.qdrant.io   # omit for in-memory
+QDRANT_API_KEY=your_qdrant_key
+LANGSMITH_API_KEY=your_langsmith_key              # optional
 ALLOWED_ORIGINS=http://localhost:3000
 ```
 
@@ -33,9 +34,10 @@ npm run dev
 The UI calls the backend at `http://localhost:8000` by default. Override with `NEXT_PUBLIC_API_BASE`.
 
 ## Usage
-1) Upload a PDF/TXT/plain text → receives `document_id`.
-2) Ask a question referencing that `document_id` → answer with `sources` is returned.
-3) Guardrails automatically protect against prompt injection and redact PII from responses.
+1. **Upload** — choose PDF / TXT / paste text → click *Upload & Index* → get a `document_id`.
+2. **Chat** — type a question → streaming answer appears token-by-token with `[c1]`-style citations.
+3. **Session** — `document_id` is saved to `sessionStorage`; refresh the page without re-uploading.
+4. **Guardrails** — prompt injection is blocked at input; PII is redacted from the full answer before display.
 
 ---
 
@@ -138,7 +140,9 @@ User Query
     |
     v Top 5
 +-------------------------------------+
-|      LLM (Llama-4-Scout)            |
+|      LLM (qwen/qwen3-32b)           |
+|      via Groq — streamed token by   |
+|      token to the browser (SSE)     |
 +-------------------------------------+
     |
     v
@@ -149,7 +153,7 @@ User Query
 +-------------------------------------+
     |
     v
-Answer + Citations + blocked flag
+Answer (streamed) + Citations + blocked flag
 ```
 
 ---
@@ -367,11 +371,14 @@ Query: "What is EC2 pricing?"
 | **Dense Embeddings** | `sentence-transformers/all-MiniLM-L6-v2` |
 | **Sparse Embeddings** | `Qdrant/bm25` (FastEmbed) |
 | **Reranker** | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
-| **LLM** | Llama-4-Scout via Groq |
-| **Eval LLM** | `llama-3.1-8b-instant` via Groq |
+| **LLM** | `qwen/qwen3-32b` via Groq (streamed) |
+| **Streaming** | FastAPI `StreamingResponse` + SSE |
+| **Rate Limiting** | `slowapi` — 10 req/min per IP |
 | **Framework** | LangChain + FastAPI |
-| **Tracing** | LangSmith |
-| **Guardrails** | Custom (ragguardrails.py) |
+| **Frontend** | Next.js 16 + React 19 + Tailwind v4 |
+| **Markdown** | `react-markdown` + `remark-gfm` |
+| **Tracing** | LangSmith (optional) |
+| **Guardrails** | Custom (`ragguardrails.py`) |
 
 ---
 
@@ -387,6 +394,11 @@ Query: "What is EC2 pricing?"
 | 5 | Vector DB swap (Qdrant) | Done |
 | 6 | Final report + ablation table | Done |
 | 7 | Guardrails (safety + PII) | Done |
+| 8 | Streaming SSE responses | Done |
+| 8 | TXT / plain-text upload in UI | Done |
+| 8 | Session persistence (sessionStorage) | Done |
+| 8 | Rate limiting (slowapi) | Done |
+| 8 | Markdown rendering (react-markdown) | Done |
 
 </details>
 
@@ -402,9 +414,7 @@ Query: "What is EC2 pricing?"
 | HyDE | Generate hypothetical answer, embed that instead of query | Better retrieval for complex questions |
 | Query Rewriting | LLM reformulates vague queries before search | Handles ambiguous user questions |
 | Multi-Document Support | Chat across multiple PDFs simultaneously | Enterprise use case |
-| Qdrant Docker/Cloud | Persistent storage (currently in-memory) | Production-ready deployment |
 | Conversation Memory | Remember previous Q&A in session | Multi-turn conversations |
-| Streaming Responses | Token-by-token output | Better UX, feels faster |
 
 </details>
 
@@ -420,8 +430,6 @@ Query: "What is EC2 pricing?"
 | Multi-modal RAG | Extract info from images/tables in PDFs | Technical documents |
 | Caching Layer | Cache frequent queries | Cost reduction, speed |
 | RAGAS Evaluation | More comprehensive eval metrics | Faithfulness, context relevance |
-| Toxicity Detection | Block harmful content generation | Content safety |
-| Fact-checking | Verify claims against sources | Reduce hallucinations |
 
 </details>
 
@@ -440,12 +448,14 @@ Query: "What is EC2 pricing?"
 ---
 
 ## Notes
-- `.env` is ignored by git (see root `.gitignore`).
-- Embeddings preload on server start for faster indexing after the first request.
+- `.env` is in `.gitignore` — never commit secrets.
+- Run the backend from the **project root** (`uvicorn backend.main:app`), not from inside `backend/`.
+- Embeddings preload at server start for faster indexing after the first request.
 - Run `python evaluate_local.py` in `backend/` to reproduce evaluation results.
-- LLM-as-Judge uses a different model (`llama-3.1-8b`) than RAG to avoid self-bias.
-- Guardrails run on every `/chat` request automatically.
-- Conclusion: Qdrant hybrid search + Guardrails provides best quality with enterprise safety.
+- LLM-as-Judge uses a different model than RAG to avoid self-bias.
+- Guardrails run on every `/chat` and `/chat/stream` request automatically.
+- Rate limiting: 10 requests/minute per IP (configurable in `main.py`).
+- `document_id` is stored in `sessionStorage` — survives page refresh, cleared on tab close.
 
 ## License
 

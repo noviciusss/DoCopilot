@@ -1,15 +1,19 @@
 ##Comments maine hi likha hai for clarity and learning purpose
 import os
+import json
 import tempfile
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import AsyncIterator, Dict, List, Optional, Tuple
 from uuid import uuid4
 import logging
 import re
 
 import dotenv
-dotenv.load_dotenv()
+from pathlib import Path as _Path
+# override=True ensures a freshly-pasted key is always picked up
+_env_path = _Path(__file__).resolve().parent.parent / ".env"
+dotenv.load_dotenv(dotenv_path=_env_path, override=True)
 
 from langsmith import Client
 from langsmith.run_helpers import traceable
@@ -59,13 +63,22 @@ logger.info("Qdrant storage path: %s", QDRANT_PATH)
 # Global client reference (created once, reused)
 _qdrant_client: Optional[QdrantClient] = None
 
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 
 def _get_qdrant_client() -> QdrantClient:
     """Get or create the singleton Qdrant client."""
     global _qdrant_client
     if _qdrant_client is None:
-        _qdrant_client = QdrantClient(path=QDRANT_PATH)
-        logger.info("Qdrant client created at %s", QDRANT_PATH)
+        if QDRANT_URL and QDRANT_API_KEY:
+            _qdrant_client = QdrantClient(
+                url=QDRANT_URL,
+                api_key=QDRANT_API_KEY,
+                timeout=120.0  # Set a generous timeout (120s) to avoid write timeouts
+            )
+        else:
+            _qdrant_client = QdrantClient(path=QDRANT_PATH)
+        logger.info("Qdrant client created")
     return _qdrant_client
 
 
@@ -130,15 +143,27 @@ def create_vector_store(docs: List[Document], collection_name: str = "documents"
     
     t0 = time.time()
     
-    # Use in-memory Qdrant (no persistence, but avoids file lock issues)
-    vectorstore = QdrantVectorStore.from_documents(
-        docs,
-        embedding=_embeddings,
-        sparse_embedding=_sparse_embeddings,
-        location=":memory:",                  # In-memory mode
-        collection_name=collection_name,
-        retrieval_mode=RetrievalMode.HYBRID,
-    )
+    if QDRANT_URL and QDRANT_API_KEY:
+        vectorstore = QdrantVectorStore.from_documents(
+            docs,
+            embedding=_embeddings,
+            sparse_embedding=_sparse_embeddings,
+            url=QDRANT_URL,
+            api_key=QDRANT_API_KEY,
+            timeout=120.0,  # Pass timeout directly to backend QdrantClient
+            collection_name=collection_name,
+            retrieval_mode=RetrievalMode.HYBRID,
+        )
+    else:
+        # Use in-memory Qdrant (no persistence, but avoids file lock issues)
+        vectorstore = QdrantVectorStore.from_documents(
+            docs,
+            embedding=_embeddings,
+            sparse_embedding=_sparse_embeddings,
+            location=":memory:",                  # In-memory mode
+            collection_name=collection_name,
+            retrieval_mode=RetrievalMode.HYBRID,
+        )
     
     logger.info("Qdrant hybrid collection '%s' created in %.2fs (%d docs)", 
                 collection_name, time.time() - t0, len(docs))
@@ -369,7 +394,10 @@ Answer (bullets):
         input_variables=["context", "question"],
     )
     final_prompt = prompt.format(context=context, question=question)
-    llm = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0)
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if not groq_api_key:
+        raise ValueError("GROQ_API_KEY is not set. Please add it to your .env file.")
+    llm = ChatGroq(model="qwen/qwen3-32b", temperature=0, api_key=groq_api_key)
     response = llm.invoke(final_prompt)
 
     answer = getattr(response, "text", None) or getattr(response, "content", str(response))
@@ -405,33 +433,115 @@ async def query_document(document_id: str , question :str)->dict:
             
 
 # ============================================
-# QDRANT UTILITY FUNCTIONS
+# STREAMING QA FUNCTION
+# ============================================
+
+async def stream_answer(
+    question: str,
+    *,
+    document_id: Optional[str] = None,
+    k: int = 5,
+) -> AsyncIterator[str]:
+    """
+    Stream the LLM answer token-by-token as SSE events.
+
+    Pipeline is identical to ask_question(), but uses llm.astream()
+    so each token chunk is yielded immediately.
+
+    SSE event format
+    ----------------
+    Token chunk:  data: {"token": "..."}
+    Final event:  data: {"done": true, "sources": [...], "answer": "<full cleaned answer>"}
+    Error event:  data: {"error": "<message>"}
+    """
+    try:
+        doc_data = get_document_data(document_id)
+    except ValueError as exc:
+        yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+        return
+
+    vectorstore = doc_data["vectorstore"]
+
+    # Step 1: Hybrid retrieval
+    retrieve_k = INITIAL_K if RERANK_ENABLED else k
+    retrieved_docs = hybrid_search(question, vectorstore, top_k=retrieve_k)
+
+    # Step 2: Rerank
+    if RERANK_ENABLED and len(retrieved_docs) > k:
+        retrieved_docs = rerank_documents(question, retrieved_docs, top_k=k)
+
+    # Step 3: Build context
+    context = "\n\n".join(
+        f"[c{i+1}] {d.page_content}\nMETADATA: {d.metadata}"
+        for i, d in enumerate(retrieved_docs)
+    )
+
+    RAG_TEMPLATE = """Role: You are a copilot-style enterprise assistant.
+
+Rules:
+- Use ONLY information supported by <context>.
+- If missing, say "I don't know based on the provided context." and ask 1 clarifying question.
+- Add citations like [c1] after every factual sentence.
+
+<context>
+{context}
+</context>
+
+Question: {question}
+Answer (bullets):
+"""
+    prompt = PromptTemplate(template=RAG_TEMPLATE, input_variables=["context", "question"])
+    final_prompt = prompt.format(context=context, question=question)
+
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if not groq_api_key:
+        yield f"data: {json.dumps({'error': 'GROQ_API_KEY is not set.'})}\n\n"
+        return
+
+    llm = ChatGroq(model="qwen/qwen3-32b", temperature=0, api_key=groq_api_key)
+    sources = list(set(doc.metadata.get("source", "") for doc in retrieved_docs))
+
+    # Step 4: Stream tokens
+    full_answer = ""
+    try:
+        async for chunk in llm.astream(final_prompt):
+            token = getattr(chunk, "content", "") or ""
+            if token:
+                full_answer += token
+                yield f"data: {json.dumps({'token': token})}\n\n"
+    except Exception as exc:
+        logger.error("Streaming error: %s", exc)
+        yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+        return
+
+    # Step 5: Output guardrails on full answer, send DONE
+    _, cleaned = RagGuardrails.check_output(full_answer, sources)
+    yield f"data: {json.dumps({'done': True, 'sources': sources, 'answer': cleaned})}\n\n"
+
+
 # ============================================
 
 def list_collections() -> List[str]:
     """List all Qdrant collections."""
     try:
-        client = QdrantClient(path=QDRANT_PATH)
+        client = _get_qdrant_client()
         collections = client.get_collections()
-        result = [c.name for c in collections.collections]
-        client.close()
-        return result
-    except Exception:
+        return [c.name for c in collections.collections]
+    except Exception as e:
+        logger.error("Failed to list collections: %s", e)
         return []
 
 
 def get_collection_info(collection_name: str) -> dict:
     """Get detailed info about a Qdrant collection."""
     try:
-        client = QdrantClient(path=QDRANT_PATH)
+        client = _get_qdrant_client()
         info = client.get_collection(collection_name)
-        result = {
+        return {
             "name": collection_name,
             "vectors_count": info.vectors_count,
             "points_count": info.points_count,
         }
-        client.close()
-        return result
     except Exception as e:
         return {"error": str(e)}
 
@@ -439,9 +549,8 @@ def get_collection_info(collection_name: str) -> dict:
 def delete_collection(collection_name: str) -> bool:
     """Delete a Qdrant collection."""
     try:
-        client = QdrantClient(path=QDRANT_PATH)
+        client = _get_qdrant_client()
         client.delete_collection(collection_name)
-        client.close()
         logger.info("Deleted collection: %s", collection_name)
         return True
     except Exception as e:
@@ -452,9 +561,8 @@ def delete_collection(collection_name: str) -> bool:
 def collection_exists(collection_name: str) -> bool:
     """Check if a collection exists."""
     try:
-        client = QdrantClient(path=QDRANT_PATH)
+        client = _get_qdrant_client()
         client.get_collection(collection_name)
-        client.close()
         return True
     except Exception:
         return False

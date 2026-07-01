@@ -1,5 +1,30 @@
+# Secrets
 .env
 .env.*
+
+# Python
 __pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Next.js
 .next/
 frontend/.next/
+node_modules/
+frontend/node_modules/
+
+# Qdrant local data
+qdrant_data/
+backend/qdrant_data/
+
+# Eval output
+backend/evaluation_results.json
+
+# Test scripts
+test_*.py
+
+# OS
+.DS_Store
+Thumbs.db
