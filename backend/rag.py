@@ -1,10 +1,11 @@
 ##Comments maine hi likha hai for clarity and learning purpose
+from __future__ import annotations
 import os
 import json
 import tempfile
 import time
 from pathlib import Path
-from typing import AsyncIterator, Dict, List, Optional, Tuple
+from typing import AsyncIterator, Dict, List, Optional, Tuple, TYPE_CHECKING
 from uuid import uuid4
 import logging
 import re
@@ -18,20 +19,6 @@ dotenv.load_dotenv(dotenv_path=_env_path, override=True)
 from langsmith import Client
 from langsmith.run_helpers import traceable
 
-from langchain_core.documents import Document
-from langchain_core.prompts import PromptTemplate
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_groq import ChatGroq
-
-# Reranking model
-from sentence_transformers import CrossEncoder
-
-## Qdrant - in place of faiss bhai shab 100 lines of bm25 and hybrid search ko ye ik line replace kar dega
-from langchain_qdrant import QdrantVectorStore, RetrievalMode, FastEmbedSparse
-from qdrant_client import QdrantClient
-
 ###Basic guadrail functions 
 from backend.ragguardrails import RagGuardrails
 
@@ -43,14 +30,26 @@ if os.getenv("LANGCHAIN_API_KEY"):
     langsmith_client = Client()
     logger.info("Langsmith client initialized")
 
+if TYPE_CHECKING:
+    from qdrant_client import QdrantClient
+    from langchain_qdrant import QdrantVectorStore
+    from langchain_core.documents import Document
+
 # Chunking config
 chunk_size = 2000
 chunk_overlap = 400
 
-splitter = RecursiveCharacterTextSplitter(
-    chunk_size=chunk_size,
-    chunk_overlap=chunk_overlap
-)
+_splitter = None
+
+def get_splitter():
+    global _splitter
+    if _splitter is None:
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
+        _splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap
+        )
+    return _splitter
 
 # Document cache - stores vectorstore and metadata
 document_cache: Dict[str, dict] = {}
@@ -70,6 +69,7 @@ def _get_qdrant_client() -> QdrantClient:
     """Get or create the singleton Qdrant client."""
     global _qdrant_client
     if _qdrant_client is None:
+        from qdrant_client import QdrantClient
         if QDRANT_URL and QDRANT_API_KEY:
             _qdrant_client = QdrantClient(
                 url=QDRANT_URL,
@@ -91,6 +91,7 @@ def get_embeddings():
     if _embeddings is None:
         logger.info("Preloading embedding model (one-time)...")
         _load_start = time.time()
+        from langchain_huggingface import HuggingFaceEmbeddings
         _embeddings = HuggingFaceEmbeddings(
             model_name='sentence-transformers/all-MiniLM-L6-v2',
             model_kwargs={'device': 'cpu'},
@@ -108,6 +109,7 @@ def get_sparse_embeddings():
     if _sparse_embeddings is None:
         logger.info("Preloading sparse embedding model for Qdrant...")
         _sparse_embed_start = time.time()
+        from langchain_qdrant import FastEmbedSparse
         _sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
         logger.info("Sparse embedding model ready in %.2fs", time.time() - _sparse_embed_start)
     return _sparse_embeddings
@@ -117,6 +119,7 @@ def get_reranker():
     if _reranker is None:
         logger.info("Preloading re-ranking model...")
         _rerank_start = time.time()
+        from sentence_transformers import CrossEncoder
         _reranker = CrossEncoder(
             'cross-encoder/ms-marco-MiniLM-L-6-v2',
             device='cpu',
@@ -148,6 +151,7 @@ def create_vector_store(docs: List[Document], collection_name: str = "documents"
         raise ValueError("No documents provided")
     
     t0 = time.time()
+    from langchain_qdrant import QdrantVectorStore, RetrievalMode
     
     if QDRANT_URL and QDRANT_API_KEY:
         vectorstore = QdrantVectorStore.from_documents(
@@ -241,11 +245,12 @@ def load_pdf_from_bytes(content: bytes, filename: str) -> List[Document]:
         tmp.write(content)
         tmp_path = tmp.name
     try:
+        from langchain_community.document_loaders import PyPDFLoader
         loader = PyPDFLoader(tmp_path)
         pages = loader.load()
         for page in pages:
             page.metadata["source"] = filename
-        docs = splitter.split_documents(pages)
+        docs = get_splitter().split_documents(pages)
         logger.info("Loaded %d chunks from %s", len(docs), filename)
         return docs
     finally:
@@ -257,7 +262,7 @@ def load_text_chunks(text: str, filename: str) -> List[Document]:
     """Load text content directly."""
     if not text.strip():
         raise ValueError('Text content is empty')
-    docs = splitter.create_documents([text], metadatas=[{"source": filename}])
+    docs = get_splitter().create_documents([text], metadatas=[{"source": filename}])
     logger.info("Loaded %d chunks from %s", len(docs), filename)
     return docs
 
@@ -266,7 +271,7 @@ def load_text_chunks(text: str, filename: str) -> List[Document]:
 def plain_text_chunks(raw_text: str, *, source: str = "user_input") -> List[Document]:
     if not raw_text.strip():
         raise ValueError("Input text is empty")
-    docs = splitter.create_documents([raw_text], metadatas=[{"source": source}])
+    docs = get_splitter().create_documents([raw_text], metadatas=[{"source": source}])
     logger.info("Created %d chunks from %s", len(docs), source)
     return docs
 
@@ -395,14 +400,11 @@ Question: {question}
 Answer (bullets):
 """
 
-    prompt = PromptTemplate(
-        template=RAG_TEMPLATE,
-        input_variables=["context", "question"],
-    )
-    final_prompt = prompt.format(context=context, question=question)
+    final_prompt = RAG_TEMPLATE.format(context=context, question=question)
     groq_api_key = os.getenv("GROQ_API_KEY")
     if not groq_api_key:
         raise ValueError("GROQ_API_KEY is not set. Please add it to your .env file.")
+    from langchain_groq import ChatGroq
     llm = ChatGroq(model="qwen/qwen3-32b", temperature=0, api_key=groq_api_key)
     response = llm.invoke(final_prompt)
 
@@ -496,14 +498,14 @@ Rules:
 Question: {question}
 Answer (bullets):
 """
-    prompt = PromptTemplate(template=RAG_TEMPLATE, input_variables=["context", "question"])
-    final_prompt = prompt.format(context=context, question=question)
+    final_prompt = RAG_TEMPLATE.format(context=context, question=question)
 
     groq_api_key = os.getenv("GROQ_API_KEY")
     if not groq_api_key:
         yield f"data: {json.dumps({'error': 'GROQ_API_KEY is not set.'})}\n\n"
         return
 
+    from langchain_groq import ChatGroq
     llm = ChatGroq(model="qwen/qwen3-32b", temperature=0, api_key=groq_api_key)
     sources = list(set(doc.metadata.get("source", "") for doc in retrieved_docs))
 
