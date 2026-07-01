@@ -82,43 +82,49 @@ def _get_qdrant_client() -> QdrantClient:
     return _qdrant_client
 
 
-# ============================================
-# PRELOAD EMBEDDINGS AT STARTUP
-# ============================================
-logger.info("Preloading embedding model (one-time)...")
-_load_start = time.time()
-_embeddings = HuggingFaceEmbeddings(
-    model_name='sentence-transformers/all-MiniLM-L6-v2',
-    model_kwargs={'device': 'cpu'},
-    encode_kwargs={
-        'normalize_embeddings': True,
-        'batch_size': 32
-    }
-)
-_embeddings.embed_query("warmup")
-logger.info("Embedding model ready in %.2fs", time.time() - _load_start)
+_embeddings = None
+_sparse_embeddings = None
+_reranker = None
 
-# ============================================
-# Preload Sparse Embeddings for Qdrant -> BM25 jaise
-# ============================================
-logger.info("Preloading sparse embedding model for Qdrant...")
-_sparse_embed_start = time.time()
-_sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
-logger.info("Sparse embedding model ready in %.2fs", time.time() - _sparse_embed_start)
+def get_embeddings():
+    global _embeddings
+    if _embeddings is None:
+        logger.info("Preloading embedding model (one-time)...")
+        _load_start = time.time()
+        _embeddings = HuggingFaceEmbeddings(
+            model_name='sentence-transformers/all-MiniLM-L6-v2',
+            model_kwargs={'device': 'cpu'},
+            encode_kwargs={
+                'normalize_embeddings': True,
+                'batch_size': 32
+            }
+        )
+        _embeddings.embed_query("warmup")
+        logger.info("Embedding model ready in %.2fs", time.time() - _load_start)
+    return _embeddings
 
+def get_sparse_embeddings():
+    global _sparse_embeddings
+    if _sparse_embeddings is None:
+        logger.info("Preloading sparse embedding model for Qdrant...")
+        _sparse_embed_start = time.time()
+        _sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
+        logger.info("Sparse embedding model ready in %.2fs", time.time() - _sparse_embed_start)
+    return _sparse_embeddings
 
-# ============================================
-# PRELOAD RERANKER MODEL AT STARTUP
-# ============================================
-logger.info("Preloading re-ranking model...")
-_rerank_start = time.time()
-_reranker = CrossEncoder(
-    'cross-encoder/ms-marco-MiniLM-L-6-v2',
-    device='cpu',
-    max_length=512,
-)
-_reranker.predict([("warmup question", "warmup passage")])
-logger.info("Re-ranking model ready in %.2fs", time.time() - _rerank_start)
+def get_reranker():
+    global _reranker
+    if _reranker is None:
+        logger.info("Preloading re-ranking model...")
+        _rerank_start = time.time()
+        _reranker = CrossEncoder(
+            'cross-encoder/ms-marco-MiniLM-L-6-v2',
+            device='cpu',
+            max_length=512,
+        )
+        _reranker.predict([("warmup question", "warmup passage")])
+        logger.info("Re-ranking model ready in %.2fs", time.time() - _rerank_start)
+    return _reranker
 
 # ============================================
 # RETRIEVAL CONFIG
@@ -130,7 +136,7 @@ FINAL_K = 5                # Final docs after reranking
 
 
 def _get_embeddings() -> HuggingFaceEmbeddings:
-    return _embeddings
+    return get_embeddings()
 
 
 @traceable(name="create_vector_store")
@@ -146,8 +152,8 @@ def create_vector_store(docs: List[Document], collection_name: str = "documents"
     if QDRANT_URL and QDRANT_API_KEY:
         vectorstore = QdrantVectorStore.from_documents(
             docs,
-            embedding=_embeddings,
-            sparse_embedding=_sparse_embeddings,
+            embedding=get_embeddings(),
+            sparse_embedding=get_sparse_embeddings(),
             url=QDRANT_URL,
             api_key=QDRANT_API_KEY,
             timeout=120.0,  # Pass timeout directly to backend QdrantClient
@@ -158,8 +164,8 @@ def create_vector_store(docs: List[Document], collection_name: str = "documents"
         # Use in-memory Qdrant (no persistence, but avoids file lock issues)
         vectorstore = QdrantVectorStore.from_documents(
             docs,
-            embedding=_embeddings,
-            sparse_embedding=_sparse_embeddings,
+            embedding=get_embeddings(),
+            sparse_embedding=get_sparse_embeddings(),
             location=":memory:",                  # In-memory mode
             collection_name=collection_name,
             retrieval_mode=RetrievalMode.HYBRID,
@@ -214,7 +220,7 @@ def rerank_documents(query: str, docs: List[Document], top_k: int = 5) -> List[D
         return docs
     
     query_doc_pairs = [(query, doc.page_content) for doc in docs]
-    scores = _reranker.predict(query_doc_pairs)
+    scores = get_reranker().predict(query_doc_pairs)
     
     scored_docs = list(zip(docs, scores))
     scored_docs.sort(key=lambda x: x[1], reverse=True)
