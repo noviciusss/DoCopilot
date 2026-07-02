@@ -89,19 +89,33 @@ _reranker = None
 def get_embeddings():
     global _embeddings
     if _embeddings is None:
-        logger.info("Preloading embedding model (one-time)...")
+        logger.info("Initializing Hugging Face Endpoint Embeddings (serverless API)...")
         _load_start = time.time()
-        from langchain_huggingface import HuggingFaceEmbeddings
-        _embeddings = HuggingFaceEmbeddings(
-            model_name='sentence-transformers/all-MiniLM-L6-v2',
-            model_kwargs={'device': 'cpu'},
-            encode_kwargs={
-                'normalize_embeddings': True,
-                'batch_size': 32
-            }
+        from langchain_huggingface import HuggingFaceEndpointEmbeddings
+        
+        hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
+        if not hf_token:
+            logger.warning("HF_TOKEN/HUGGINGFACEHUB_API_TOKEN is not set. Inference API calls might fail or be heavily rate-limited.")
+            
+        _embeddings = HuggingFaceEndpointEmbeddings(
+            model="sentence-transformers/all-MiniLM-L6-v2",
+            task="feature-extraction",
+            huggingfacehub_api_token=hf_token
         )
-        _embeddings.embed_query("warmup")
-        logger.info("Embedding model ready in %.2fs", time.time() - _load_start)
+        
+        # OLD AND LOCAL:
+        # from langchain_huggingface import HuggingFaceEmbeddings
+        # _embeddings = HuggingFaceEmbeddings(
+        #     model_name='sentence-transformers/all-MiniLM-L6-v2',
+        #     model_kwargs={'device': 'cpu'},
+        #     encode_kwargs={
+        #         'normalize_embeddings': True,
+        #         'batch_size': 32
+        #     }
+        # )
+        # _embeddings.embed_query("warmup")
+        
+        logger.info("Embedding model endpoint ready in %.2fs", time.time() - _load_start)
     return _embeddings
 
 def get_sparse_embeddings():
@@ -115,19 +129,22 @@ def get_sparse_embeddings():
     return _sparse_embeddings
 
 def get_reranker():
-    global _reranker
-    if _reranker is None:
-        logger.info("Preloading re-ranking model...")
-        _rerank_start = time.time()
-        from sentence_transformers import CrossEncoder
-        _reranker = CrossEncoder(
-            'cross-encoder/ms-marco-MiniLM-L-6-v2',
-            device='cpu',
-            max_length=512,
-        )
-        _reranker.predict([("warmup question", "warmup passage")])
-        logger.info("Re-ranking model ready in %.2fs", time.time() - _rerank_start)
-    return _reranker
+    # Deprecated: We use Cohere Rerank API over HTTP instead of a local model.
+    # OLD AND LOCAL:
+    # global _reranker
+    # if _reranker is None:
+    #     logger.info("Preloading re-ranking model...")
+    #     _rerank_start = time.time()
+    #     from sentence_transformers import CrossEncoder
+    #     _reranker = CrossEncoder(
+    #         'cross-encoder/ms-marco-MiniLM-L-6-v2',
+    #         device='cpu',
+    #         max_length=512,
+    #     )
+    #     _reranker.predict([("warmup question", "warmup passage")])
+    #     logger.info("Re-ranking model ready in %.2fs", time.time() - _rerank_start)
+    # return _reranker
+    return None
 
 # ============================================
 # RETRIEVAL CONFIG
@@ -138,7 +155,7 @@ INITIAL_K = 20             # Retrieve this many docs
 FINAL_K = 5                # Final docs after reranking
 
 
-def _get_embeddings() -> HuggingFaceEmbeddings:
+def _get_embeddings():
     return get_embeddings()
 
 
@@ -212,26 +229,54 @@ def hybrid_search(
 @traceable(name="rerank_documents")
 def rerank_documents(query: str, docs: List[Document], top_k: int = 5) -> List[Document]:
     """
-    Re-rank documents using CrossEncoder.
-    
-    Why rerank after retrieval?
-    - Bi-encoder (embedding): Fast but approximate
-    - Cross-encoder (reranker): Slow but accurate
+    Re-rank documents using Cohere Rerank API.
     
     Pipeline: All chunks → Hybrid (fast, top 20) → Rerank (accurate, top 5) → LLM
     """
     if not docs:
         return docs
     
-    query_doc_pairs = [(query, doc.page_content) for doc in docs]
-    scores = get_reranker().predict(query_doc_pairs)
-    
-    scored_docs = list(zip(docs, scores))
-    scored_docs.sort(key=lambda x: x[1], reverse=True)
-    
-    logger.info("Reranking: %d docs → top %d", len(docs), top_k)
-    
-    return [doc for doc, _ in scored_docs[:top_k]]
+    cohere_api_key = os.getenv("COHERE_API_KEY")
+    if not cohere_api_key:
+        logger.warning("COHERE_API_KEY is not set. Skipping reranking.")
+        return docs[:top_k]
+        
+    import httpx
+    try:
+        headers = {
+            "Authorization": f"Bearer {cohere_api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "rerank-english-v3.0",
+            "query": query,
+            "documents": [doc.page_content for doc in docs],
+            "top_n": top_k
+        }
+        
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.post("https://api.cohere.com/v1/rerank", headers=headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            
+        reranked_docs = []
+        for result in data.get("results", []):
+            idx = result["index"]
+            reranked_docs.append(docs[idx])
+            
+        # OLD AND LOCAL:
+        # query_doc_pairs = [(query, doc.page_content) for doc in docs]
+        # scores = get_reranker().predict(query_doc_pairs)
+        # scored_docs = list(zip(docs, scores))
+        # scored_docs.sort(key=lambda x: x[1], reverse=True)
+        # logger.info("Reranking: %d docs → top %d", len(docs), top_k)
+        # reranked_docs = [doc for doc, _ in scored_docs[:top_k]]
+            
+        logger.info("Cohere Rerank successful: %d docs → top %d", len(docs), len(reranked_docs))
+        return reranked_docs
+    except Exception as e:
+        logger.error("Cohere Rerank failed: %s. Returning top %d un-reranked documents.", e, top_k)
+        return docs[:top_k]
 
 
 # ============================================
