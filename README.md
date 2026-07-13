@@ -14,16 +14,23 @@ A Next.js + FastAPI RAG app: upload PDFs, TXT files, or paste text — embed int
 ```bash
 # From the project root (important — keeps module paths correct)
 pip install -r backend/requirements.txt
+
+# (Optional) Install development & test dependencies for running evaluation tests
+pip install -r backend/requirements-dev.txt
+
+# Start the API server
 uvicorn backend.main:app --reload --port 8000
 ```
 Environment variables (copy `.env.example` → `.env`, do not commit):
 ```
 GROQ_API_KEY=gsk_...
-QDRANT_URL=https://your-cluster.cloud.qdrant.io   # omit for in-memory
-QDRANT_API_KEY=your_qdrant_key
+QDRANT_URL=https://your-cluster.cloud.qdrant.io   # omit to persist to local disk (./qdrant_data)
+QDRANT_API_KEY=your_qdrant_key                     # optional if using local unsecured Qdrant
+HF_TOKEN=your_huggingface_token                    # optional (needed for remote embeddings API in prod)
 LANGSMITH_API_KEY=your_langsmith_key              # optional
 ALLOWED_ORIGINS=http://localhost:3000
 ```
+
 
 ## Frontend Setup
 ```bash
@@ -199,28 +206,39 @@ Avg Latency:          2.86s
 
 ## Known Issues & Solutions
 
-> ### Qdrant Local Storage Lock
+> ### Qdrant Local Storage Fallback & Server Restart resilience
 > 
-> **Error:**
-> ```
-> RuntimeError: Storage folder ./qdrant_data is already accessed 
-> by another instance of Qdrant client
-> ```
+> **Mechanism:**
+> - When `QDRANT_URL` is omitted in the environment, the backend automatically falls back to persisting files on local disk under `./qdrant_data`.
+> - **Server Restart Resilience:** The RAG metadata database (`store_document_cache`) registers the vector store's collection name. If the Python server restarts and the local in-memory document metadata mapping is lost, the backend automatically reconstructs the `QdrantVectorStore` instance directly from the persistent Qdrant database/disk.
 > 
-> **Cause:** Qdrant local mode (`path=`) uses file locking. Only ONE client can access at a time.
+> ---
 > 
-> **Solutions:**
-> | Option | Code | Persistence |
-> |--------|------|-------------|
-> | In-Memory | `location=":memory:"` | No |
-> | Docker Server | `url="http://localhost:6333"` | Yes |
-> | Qdrant Cloud | `url="https://xxx.cloud.qdrant.io"` | Yes |
+> ## Multi-Tenancy Scoping
 > 
-> **Current:** Using `:memory:` for development (no persistence).
-
----
-
-> ### Version Mismatch Error
+> Each document index and chat session is partitioned by a `tenant_id` (defaults to `"default"`):
+> - **Metadata Isolation:** Every indexed chunk has a `tenant_id` field added to its metadata.
+> - **Keyword Indexing:** Qdrant automatically creates a keyword payload index on `metadata.tenant_id` for efficient filtering queries.
+> - **Search-Time Isolation:** All query retrieval steps (`hybrid_search`) use Qdrant payload filters to ensure Tenant A cannot retrieve or search Tenant B's data under any circumstances.
+> - **API Integration:** FastAPI endpoints (`/upload`, `/chat`, `/chat/stream`) accept a `tenant_id` field in the request payload or forms.
+> 
+> ---
+> 
+> ## CI/CD Regression Evaluation Suite
+> 
+> The project has an automated evaluation regression suite to ensure retrieval and LLM correctness/relevance do not drop below a baseline.
+> 
+> - **Local Run:**
+>   ```bash
+>   pytest tests/test_rag_eval.py -v -s
+>   ```
+> - **CI/CD (GitHub Actions):** Runs on push and pull requests to `main`. It spins up a local Qdrant container as a runner service container.
+> - **Evaluation Mode:** Runs a fast subset (5 representative questions) by default in CI to save API credits, or full suite if `RUN_FULL_EVAL=true` is set.
+> - **Graceful Skip:** The suite automatically skips gracefully with an informative message if `GROQ_API_KEY` is not present in the environment secrets.
+> 
+> ---
+> 
+> ## Version Mismatch Error
 > 
 > **Error:**
 > ```
