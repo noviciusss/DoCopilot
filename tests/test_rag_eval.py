@@ -4,6 +4,14 @@ import pytest
 from backend.rag import index_get_pdf, ask_question
 from backend.evaluate_local import llm_correctness, llm_relevance, load_questions
 
+# Skip the entire module if GROQ_API_KEY is not configured.
+# Add it as a GitHub Actions secret: Settings → Secrets and variables → Actions → New secret
+# Name: GROQ_API_KEY  Value: your Groq API key (https://console.groq.com/keys)
+pytestmark = pytest.mark.skipif(
+    not os.getenv("GROQ_API_KEY"),
+    reason="GROQ_API_KEY secret is not configured — add it to GitHub Actions secrets to enable the LLM eval suite.",
+)
+
 # Baselines from previous manual eval
 BASE_CORRECTNESS = 0.892
 BASE_RELEVANCE = 0.900
@@ -11,6 +19,7 @@ BASE_RELEVANCE = 0.900
 # Tolerate up to 8% drop to account for LLM non-determinism
 CORRECTNESS_THRESHOLD = BASE_CORRECTNESS - 0.08
 RELEVANCE_THRESHOLD = BASE_RELEVANCE - 0.08
+
 
 @pytest.fixture(scope="module")
 def indexed_document():
