@@ -91,35 +91,22 @@ _reranker = None
 def get_embeddings():
     global _embeddings
     if _embeddings is None:
-        logger.info("Initializing Hugging Face Endpoint Embeddings (serverless API)...")
+        logger.info("Initializing local sentence-transformers embeddings...")
         _load_start = time.time()
-        from langchain_huggingface import HuggingFaceEndpointEmbeddings
-        
-        raw_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
-        hf_token = raw_token.strip() if raw_token else None
-        if not hf_token:
-            hf_token = None
-            logger.warning("HF_TOKEN/HUGGINGFACEHUB_API_TOKEN is not set. Inference API calls might fail or be heavily rate-limited.")
-            
-        _embeddings = HuggingFaceEndpointEmbeddings(
-            model="sentence-transformers/all-MiniLM-L6-v2",
-            task="feature-extraction",
-            huggingfacehub_api_token=hf_token
+        from langchain_huggingface import HuggingFaceEmbeddings
+
+        _embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            model_kwargs={"device": "cpu"},
+            encode_kwargs={
+                "normalize_embeddings": True,
+                "batch_size": 32,
+            },
         )
-        
-        # OLD AND LOCAL:
-        # from langchain_huggingface import HuggingFaceEmbeddings
-        # _embeddings = HuggingFaceEmbeddings(
-        #     model_name='sentence-transformers/all-MiniLM-L6-v2',
-        #     model_kwargs={'device': 'cpu'},
-        #     encode_kwargs={
-        #         'normalize_embeddings': True,
-        #         'batch_size': 32
-        #     }
-        # )
-        # _embeddings.embed_query("warmup")
-        
-        logger.info("Embedding model endpoint ready in %.2fs", time.time() - _load_start)
+        # Warm up the model so the first real call is fast
+        _embeddings.embed_query("warmup")
+
+        logger.info("Embedding model ready in %.2fs", time.time() - _load_start)
     return _embeddings
 
 def get_sparse_embeddings():
