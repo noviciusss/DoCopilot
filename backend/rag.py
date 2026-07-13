@@ -70,13 +70,15 @@ def _get_qdrant_client() -> QdrantClient:
     global _qdrant_client
     if _qdrant_client is None:
         from qdrant_client import QdrantClient
-        if QDRANT_URL and QDRANT_API_KEY:
+        if QDRANT_URL:
+            logger.info("Connecting to Qdrant server at: %s", QDRANT_URL)
             _qdrant_client = QdrantClient(
                 url=QDRANT_URL,
-                api_key=QDRANT_API_KEY,
+                api_key=QDRANT_API_KEY if QDRANT_API_KEY else None,
                 timeout=120.0  # Set a generous timeout (120s) to avoid write timeouts
             )
         else:
+            logger.info("Using local Qdrant directory: %s", QDRANT_PATH)
             _qdrant_client = QdrantClient(path=QDRANT_PATH)
         logger.info("Qdrant client created")
     return _qdrant_client
@@ -170,27 +172,39 @@ def create_vector_store(docs: List[Document], collection_name: str = "documents"
     t0 = time.time()
     from langchain_qdrant import QdrantVectorStore, RetrievalMode
     
-    if QDRANT_URL and QDRANT_API_KEY:
+    if QDRANT_URL:
         vectorstore = QdrantVectorStore.from_documents(
             docs,
             embedding=get_embeddings(),
             sparse_embedding=get_sparse_embeddings(),
             url=QDRANT_URL,
-            api_key=QDRANT_API_KEY,
-            timeout=120.0,  # Pass timeout directly to backend QdrantClient
+            api_key=QDRANT_API_KEY if QDRANT_API_KEY else None,
+            timeout=120.0,
             collection_name=collection_name,
             retrieval_mode=RetrievalMode.HYBRID,
         )
     else:
-        # Use in-memory Qdrant (no persistence, but avoids file lock issues)
         vectorstore = QdrantVectorStore.from_documents(
             docs,
             embedding=get_embeddings(),
             sparse_embedding=get_sparse_embeddings(),
-            location=":memory:",                  # In-memory mode
+            path=QDRANT_PATH,
             collection_name=collection_name,
             retrieval_mode=RetrievalMode.HYBRID,
         )
+    
+    # Create keyword payload index for tenant_id filtering
+    try:
+        from qdrant_client.models import PayloadSchemaType
+        client = _get_qdrant_client()
+        client.create_payload_index(
+            collection_name=collection_name,
+            field_name="metadata.tenant_id",
+            field_schema=PayloadSchemaType.KEYWORD
+        )
+        logger.info("Created keyword payload index for metadata.tenant_id on collection '%s'", collection_name)
+    except Exception as e:
+        logger.warning("Could not create payload index on collection '%s': %s", collection_name, e)
     
     logger.info("Qdrant hybrid collection '%s' created in %.2fs (%d docs)", 
                 collection_name, time.time() - t0, len(docs))
@@ -202,7 +216,8 @@ def create_vector_store(docs: List[Document], collection_name: str = "documents"
 def hybrid_search(
     query: str,
     vectorstore: QdrantVectorStore,
-    top_k: int = 20
+    top_k: int = 20,
+    tenant_id: str = "default"
 ) -> List[Document]:
     """
     Qdrant built-in hybrid search.
@@ -221,8 +236,19 @@ def hybrid_search(
     
     All in ONE function call!
     """
-    results = vectorstore.similarity_search(query, k=top_k)
-    logger.info("Hybrid search retrieved %d docs for '%s...'", len(results), query[:30])
+    from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+    tenant_filter = Filter(
+        must=[
+            FieldCondition(
+                key="metadata.tenant_id",
+                match=MatchValue(value=tenant_id)
+            )
+        ]
+    ) if tenant_id else None
+
+    results = vectorstore.similarity_search(query, k=top_k, filter=tenant_filter)
+    logger.info("Hybrid search retrieved %d docs for tenant '%s' and query '%s...'", len(results), tenant_id, query[:30])
     return results
 
 
@@ -337,7 +363,7 @@ def store_document_cache(docs: List[Document], vectorstore: QdrantVectorStore, c
     global current_document_id, document_cache
     document_cache.clear()
     
-    document_id = str(uuid4())
+    document_id = collection_name
     
     document_cache[document_id] = {
         "vectorstore": vectorstore,
@@ -351,10 +377,12 @@ def store_document_cache(docs: List[Document], vectorstore: QdrantVectorStore, c
 
 
 @traceable(name="index_get_pdf", tags=["indexing"])
-def index_get_pdf(content: bytes, filename: str) -> str:
+def index_get_pdf(content: bytes, filename: str, tenant_id: str = "default") -> str:
     """Index PDF from bytes content."""
     t0 = time.time()
     docs = load_pdf_from_bytes(content, filename)
+    for doc in docs:
+        doc.metadata["tenant_id"] = tenant_id
     collection_name = re.sub(r'[^a-zA-Z0-9_]', '_', filename.rsplit('.', 1)[0])[:50]
     vectorstore = create_vector_store(docs, collection_name)
     doc_id = store_document_cache(docs, vectorstore, collection_name)
@@ -363,27 +391,53 @@ def index_get_pdf(content: bytes, filename: str) -> str:
 
 
 @traceable(name="index_get_txt", tags=["indexing"])
-def index_get_txt(text: str, filename: str) -> str:
+def index_get_txt(text: str, filename: str, tenant_id: str = "default") -> str:
     """Index text content directly."""
     docs = load_text_chunks(text, filename)
+    for doc in docs:
+        doc.metadata["tenant_id"] = tenant_id
     collection_name = re.sub(r'[^a-zA-Z0-9_]', '_', filename.rsplit('.', 1)[0])[:50]
     vectorstore = create_vector_store(docs, collection_name)
     return store_document_cache(docs, vectorstore, collection_name)
 
 
 @traceable(name="index_get_plain_text", tags=["indexing"])
-def index_get_plain_text(raw_text: str) -> str:
+def index_get_plain_text(raw_text: str, tenant_id: str = "default") -> str:
     docs = plain_text_chunks(raw_text)
+    for doc in docs:
+        doc.metadata["tenant_id"] = tenant_id
     collection_name = "plain_text"
     vectorstore = create_vector_store(docs, collection_name)
     return store_document_cache(docs, vectorstore, collection_name)
 
 
 def get_document_data(document_id: Optional[str] = None) -> dict:
-    """Get all document data from cache."""
+    """Get all document data from cache. Reconstructs if missing but exists in database."""
     target_id = document_id or current_document_id
-    if not target_id or target_id not in document_cache:
+    if not target_id:
         raise ValueError("No document found for the given ID")
+        
+    if target_id not in document_cache:
+        # Check if collection exists in Qdrant database to reconstruct vectorstore wrapper
+        if collection_exists(target_id):
+            logger.info("Reconstructing vectorstore for existing collection: %s", target_id)
+            from langchain_qdrant import QdrantVectorStore, RetrievalMode
+            client = _get_qdrant_client()
+            vectorstore = QdrantVectorStore(
+                client=client,
+                collection_name=target_id,
+                embedding=get_embeddings(),
+                sparse_embedding=get_sparse_embeddings(),
+                retrieval_mode=RetrievalMode.HYBRID,
+            )
+            document_cache[target_id] = {
+                "vectorstore": vectorstore,
+                "collection_name": target_id,
+                "docs": [],  # We don't have original docs, but it's not needed for query
+            }
+        else:
+            raise ValueError(f"No document/collection found for the given ID: {target_id}")
+            
     return document_cache[target_id]
 
 
@@ -402,7 +456,7 @@ def get_document_data(document_id: Optional[str] = None) -> dict:
     },
     tags=["rag", "qa", "hybrid", "qdrant"]
 )
-def ask_question(question: str, *, document_id: Optional[str] = None, k: int = 5) -> tuple[str, list[str]]:
+def ask_question(question: str, *, document_id: Optional[str] = None, k: int = 5, tenant_id: str = "default") -> tuple[str, list[str]]:
     """
     Main RAG question-answering function.
     
@@ -416,7 +470,7 @@ def ask_question(question: str, *, document_id: Optional[str] = None, k: int = 5
     
     # Step 1: Retrieval (Qdrant hybrid search)
     retrieve_k = INITIAL_K if RERANK_ENABLED else k
-    retrieved_docs = hybrid_search(question, vectorstore, top_k=retrieve_k)
+    retrieved_docs = hybrid_search(question, vectorstore, top_k=retrieve_k, tenant_id=tenant_id)
     
     logger.info("Retrieved %d documents for question: '%s...'", len(retrieved_docs), question[:50])
     
@@ -459,7 +513,7 @@ Answer (bullets):
     return answer, sources
 
 # ============================================
-async def query_document(document_id: str , question :str)->dict:
+async def query_document(document_id: str, question: str, tenant_id: str = "default") -> dict:
     """Query a document with guradrails checks
     """
     ##input check
@@ -470,7 +524,7 @@ async def query_document(document_id: str , question :str)->dict:
                 "sources":[]}
 
     try : 
-        answer,sources = ask_question(question,document_id=document_id)
+        answer,sources = ask_question(question,document_id=document_id,tenant_id=tenant_id)
         _,cleaned_answer = RagGuardrails.check_output(answer,sources)
         
         return {"answer":cleaned_answer,
@@ -494,6 +548,7 @@ async def stream_answer(
     *,
     document_id: Optional[str] = None,
     k: int = 5,
+    tenant_id: str = "default",
 ) -> AsyncIterator[str]:
     """
     Stream the LLM answer token-by-token as SSE events.
@@ -517,7 +572,7 @@ async def stream_answer(
 
     # Step 1: Hybrid retrieval
     retrieve_k = INITIAL_K if RERANK_ENABLED else k
-    retrieved_docs = hybrid_search(question, vectorstore, top_k=retrieve_k)
+    retrieved_docs = hybrid_search(question, vectorstore, top_k=retrieve_k, tenant_id=tenant_id)
 
     # Step 2: Rerank
     if RERANK_ENABLED and len(retrieved_docs) > k:

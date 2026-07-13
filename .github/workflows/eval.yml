@@ -1,0 +1,55 @@
+name: RAG Evaluation Regression Suite
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'tests/**'
+      - 'data.jsonl'
+      - 'aws-overview.pdf'
+      - '.github/workflows/eval.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'tests/**'
+      - 'data.jsonl'
+      - 'aws-overview.pdf'
+      - '.github/workflows/eval.yml'
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+
+    services:
+      qdrant:
+        image: qdrant/qdrant:v1.12.1
+        ports:
+          - 6333:6333
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r backend/requirements.txt
+
+    - name: Run Pytest Regression Suite
+      env:
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+        QDRANT_URL: http://localhost:6333
+        RUN_FULL_EVAL: "false"  # Run fast subset (5 questions) in CI to control cost
+        PYTHONPATH: .
+      run: |
+        pytest tests/test_rag_eval.py -v -s

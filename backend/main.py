@@ -1,4 +1,4 @@
-﻿import os
+import os
 import logging
 from typing import Optional, Any
 
@@ -68,6 +68,7 @@ class UploadResponse(BaseModel):
 class ChatRequest(BaseModel):
     question: str
     document_id: Optional[str] = None
+    tenant_id: str = "default"
 
 
 class ChatResponse(BaseModel):
@@ -104,6 +105,7 @@ async def upload_document(
     pdf_file: UploadFile | None = File(default=None),
     txt_file: UploadFile | None = File(default=None),
     plain_text: str | None = Form(default=None),
+    tenant_id: str = Form(default="default"),
 ) -> UploadResponse:
     try:
         pdf_upload = _coerce_upload(pdf_file)
@@ -113,26 +115,26 @@ async def upload_document(
         max_bytes = max_mb * 1024 * 1024
 
         if pdf_upload is not None:
-            logger.info("Processing PDF upload: %s", pdf_upload.filename)
+            logger.info("Processing PDF upload: %s for tenant: %s", pdf_upload.filename, tenant_id)
             contents = await pdf_upload.read()
             if len(contents) > max_bytes:
                 raise HTTPException(status_code=413, detail=f"File too large. Max {max_mb}MB.")
-            doc_id = index_get_pdf(contents, pdf_upload.filename or "document.pdf")
+            doc_id = index_get_pdf(contents, pdf_upload.filename or "document.pdf", tenant_id=tenant_id)
             return UploadResponse(document_id=doc_id)
 
         if txt_upload is not None:
-            logger.info("Processing TXT upload: %s", txt_upload.filename)
+            logger.info("Processing TXT upload: %s for tenant: %s", txt_upload.filename, tenant_id)
             contents = await txt_upload.read()
             if len(contents) > max_bytes:
                 raise HTTPException(status_code=413, detail=f"File too large. Max {max_mb}MB.")
-            doc_id = index_get_txt(contents.decode("utf-8"), txt_upload.filename or "document.txt")
+            doc_id = index_get_txt(contents.decode("utf-8"), txt_upload.filename or "document.txt", tenant_id=tenant_id)
             return UploadResponse(document_id=doc_id)
 
         if plain_text is not None and plain_text.strip():
-            logger.info("Processing plain text upload")
+            logger.info("Processing plain text upload for tenant: %s", tenant_id)
             if len(plain_text.encode("utf-8")) > max_bytes:
                 raise HTTPException(status_code=413, detail=f"Text too long. Max {max_mb}MB.")
-            doc_id = index_get_plain_text(plain_text)
+            doc_id = index_get_plain_text(plain_text, tenant_id=tenant_id)
             return UploadResponse(document_id=doc_id)
 
         raise HTTPException(status_code=400, detail="No file or text provided")
@@ -155,6 +157,7 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
         result = await query_document(
             document_id=body.document_id,
             question=body.question,
+            tenant_id=body.tenant_id,
         )
         return ChatResponse(
             answer=result["answer"],
@@ -194,7 +197,7 @@ async def chat_stream(request: Request, body: ChatRequest) -> StreamingResponse:
         )
 
     return StreamingResponse(
-        stream_answer(body.question, document_id=body.document_id),
+        stream_answer(body.question, document_id=body.document_id, tenant_id=body.tenant_id),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

@@ -11,6 +11,7 @@ services:
       - .env
     environment:
       - ALLOWED_ORIGINS=http://localhost:3000
+      - QDRANT_URL=http://qdrant:6333
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
