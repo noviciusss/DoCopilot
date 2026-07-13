@@ -91,20 +91,33 @@ _reranker = None
 def get_embeddings():
     global _embeddings
     if _embeddings is None:
-        logger.info("Initializing local sentence-transformers embeddings...")
         _load_start = time.time()
-        from langchain_huggingface import HuggingFaceEmbeddings
 
-        _embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
-            model_kwargs={"device": "cpu"},
-            encode_kwargs={
-                "normalize_embeddings": True,
-                "batch_size": 32,
-            },
-        )
-        # Warm up the model so the first real call is fast
-        _embeddings.embed_query("warmup")
+        # In CI, sentence-transformers is installed locally (requirements-dev.txt).
+        # On Render free tier, it is NOT installed to stay under the 512MB RAM limit;
+        # instead we use the remote HuggingFace Inference API (no RAM cost).
+        try:
+            import sentence_transformers  # noqa: F401 — presence check only
+            logger.info("sentence-transformers detected — using local embeddings (CI mode).")
+            from langchain_huggingface import HuggingFaceEmbeddings
+            _embeddings = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2",
+                model_kwargs={"device": "cpu"},
+                encode_kwargs={"normalize_embeddings": True, "batch_size": 32},
+            )
+            _embeddings.embed_query("warmup")
+        except ImportError:
+            logger.info("sentence-transformers not installed — using HuggingFace Inference API (production mode).")
+            from langchain_huggingface import HuggingFaceEndpointEmbeddings
+            raw_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
+            hf_token = raw_token.strip() if raw_token else None
+            if not hf_token:
+                logger.warning("HF_TOKEN is not set. HuggingFace Inference API calls may be rate-limited.")
+            _embeddings = HuggingFaceEndpointEmbeddings(
+                model="sentence-transformers/all-MiniLM-L6-v2",
+                task="feature-extraction",
+                huggingfacehub_api_token=hf_token,
+            )
 
         logger.info("Embedding model ready in %.2fs", time.time() - _load_start)
     return _embeddings

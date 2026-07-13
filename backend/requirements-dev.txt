@@ -1,0 +1,6 @@
+# CI/Dev-only dependencies — DO NOT install on production server (Render free tier)
+# sentence-transformers loads ~90MB model into RAM, exceeding Render's 512MB free limit.
+# In production, embeddings use HuggingFaceEndpointEmbeddings (remote API, no RAM cost).
+# In CI, we use local embeddings to avoid needing a HF_TOKEN secret.
+sentence-transformers==5.0.0
+pytest==8.2.2
