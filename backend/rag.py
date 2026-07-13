@@ -95,8 +95,10 @@ def get_embeddings():
         _load_start = time.time()
         from langchain_huggingface import HuggingFaceEndpointEmbeddings
         
-        hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
+        raw_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
+        hf_token = raw_token.strip() if raw_token else None
         if not hf_token:
+            hf_token = None
             logger.warning("HF_TOKEN/HUGGINGFACEHUB_API_TOKEN is not set. Inference API calls might fail or be heavily rate-limited.")
             
         _embeddings = HuggingFaceEndpointEmbeddings(
