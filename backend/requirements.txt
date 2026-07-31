@@ -16,5 +16,19 @@ langsmith==0.9.4
 httpx==0.28.1
 python-multipart==0.0.32
 slowapi==0.1.9
+# Database & ORM
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+psycopg2-binary>=2.9.9
+asyncpg>=0.29.0
+
+# Authentication & Security
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Task Queue & Cache
+celery>=5.3.6
+redis>=5.0.1
+
 # pytest is in requirements-dev.txt (CI only)
 

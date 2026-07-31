@@ -18,18 +18,22 @@ pip install -r backend/requirements.txt
 # (Optional) Install development & test dependencies for running evaluation tests
 pip install -r backend/requirements-dev.txt
 
+# Start services via Docker Compose (PostgreSQL, Qdrant, Redis)
+docker compose up -d postgres qdrant redis
+
 # Start the API server
 uvicorn backend.main:app --reload --port 8000
 ```
 Environment variables (copy `.env.example` → `.env`, do not commit):
 ```
 GROQ_API_KEY=gsk_...
-QDRANT_URL=https://your-cluster.cloud.qdrant.io   # omit to persist to local disk (./qdrant_data)
-QDRANT_API_KEY=your_qdrant_key                     # optional if using local unsecured Qdrant
-HF_TOKEN=your_huggingface_token                    # optional (needed for remote embeddings API in prod)
-LANGSMITH_API_KEY=your_langsmith_key              # optional
+QDRANT_URL=http://localhost:6333                     # or Qdrant Cloud URL
+DATABASE_URL=postgresql+asyncpg://docopilot:docopilot@localhost:5432/docopilot
+JWT_SECRET_KEY=your_secret_key
+CELERY_BROKER_URL=redis://localhost:6379/0
 ALLOWED_ORIGINS=http://localhost:3000
 ```
+
 
 
 ## Frontend Setup
