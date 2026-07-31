@@ -506,7 +506,7 @@ Answer (bullets):
     if not groq_api_key:
         raise ValueError("GROQ_API_KEY is not set. Please add it to your .env file.")
     from langchain_groq import ChatGroq
-    llm = ChatGroq(model="qwen/qwen3-32b", temperature=0, api_key=groq_api_key)
+    llm = ChatGroq(model="qwen/qwen3.6-27b", temperature=0, api_key=groq_api_key)
     response = llm.invoke(final_prompt)
 
     answer = getattr(response, "text", None) or getattr(response, "content", str(response))
