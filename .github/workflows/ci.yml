@@ -22,7 +22,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U docopilot"
+          --health-cmd "pg_isready -U docopilot -d docopilot_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -31,11 +31,9 @@ jobs:
         image: qdrant/qdrant:v1.12.1
         ports:
           - 6333:6333
-        options: >-
-          --health-cmd "curl -f http://localhost:6333/readyz"
-          --health-interval 15s
-          --health-timeout 5s
-          --health-retries 5
+        # No --health-cmd here: qdrant image has no curl/wget inside the container.
+        # We use a manual wait step in the job steps instead (see below).
+
 
     env:
       DATABASE_URL: postgresql+asyncpg://docopilot:docopilot@localhost:5432/docopilot_test
@@ -58,6 +56,21 @@ jobs:
           pip install -r backend/requirements.txt
           pip install -r backend/requirements-dev.txt
           pip install pytest-asyncio
+
+      # Runner (ubuntu-latest) has curl. We poll from outside the container.
+      # Qdrant image itself has no curl, so we can't use a Docker health-cmd.
+      - name: Wait for Qdrant to be ready
+        run: |
+          echo "Waiting for Qdrant on port 6333..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:6333/readyz > /dev/null 2>&1; then
+              echo "Qdrant is ready after $i attempts."
+              exit 0
+            fi
+            echo "  attempt $i/30 — not ready yet, sleeping 2s..."
+            sleep 2
+          done
+          echo "Qdrant did not become ready in 60s." && exit 1
 
       - name: Run unit + integration tests
         # '|| true' prevents failure when no non-eval tests exist yet.
