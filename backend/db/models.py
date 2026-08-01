@@ -36,7 +36,7 @@ class Tenant(Base):
 
 
 class TenantMembership(Base):
-    __tablename__ = "ten ant_memberships"
+    __tablename__ = "tenant_memberships"
 
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
@@ -101,6 +101,7 @@ class EvaluationRun(Base):
     run_name: Mapped[str] = mapped_column(String(255), nullable=False)
     dataset_version: Mapped[str] = mapped_column(String(50), default="v1.0")
     total_cases: Mapped[int] = mapped_column(Integer, nullable=False)
-    metrics: Mapped[dict] = mapped_column(JSONB if engine.dialect.name == "postgresql" else JSON, nullable=False)
+    # Always JSONB — we use PostgreSQL as the only supported relational backend
+    metrics: Mapped[dict] = mapped_column(JSONB, nullable=False)
     created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
