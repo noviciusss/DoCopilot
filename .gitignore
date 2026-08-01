@@ -25,6 +25,11 @@ backend/evaluation_results.json
 # Test scripts
 test_*.py
 
+# Planning & Masterplan docs
+project_update_masterplan.md
+implementation_plan.md
+
 # OS
 .DS_Store
 Thumbs.db
+
