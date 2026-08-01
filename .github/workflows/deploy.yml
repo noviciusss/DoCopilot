@@ -7,7 +7,6 @@ on:
 jobs:
   deploy-backend:
     runs-on: ubuntu-latest
-    needs: []  # Set to: needs: [test] when CI workflow is in same file
 
     steps:
       - name: Checkout code
@@ -18,16 +17,26 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Build and push Docker image to ACR
+      # az acr build (ACR Tasks) is blocked on Azure for Students.
+      # Instead: log into ACR with docker, build locally on the runner, then push.
+      - name: Log in to Azure Container Registry
         run: |
-          az acr build \
-            --registry ${{ secrets.ACR_NAME }} \
-            --image docopilot-backend:${{ github.sha }} \
-            --image docopilot-backend:latest \
-            --file backend/Dockerfile \
+          az acr login --name ${{ secrets.ACR_NAME }}
+
+      - name: Build Docker image (local runner build)
+        run: |
+          docker build \
+            -f backend/Dockerfile \
+            -t ${{ secrets.ACR_NAME }}.azurecr.io/docopilot-backend:${{ github.sha }} \
+            -t ${{ secrets.ACR_NAME }}.azurecr.io/docopilot-backend:latest \
             .
 
-      - name: Deploy to Azure Container Apps
+      - name: Push Docker image to ACR
+        run: |
+          docker push ${{ secrets.ACR_NAME }}.azurecr.io/docopilot-backend:${{ github.sha }}
+          docker push ${{ secrets.ACR_NAME }}.azurecr.io/docopilot-backend:latest
+
+      - name: Deploy new image to Azure Container Apps
         run: |
           az containerapp update \
             --name docopilot-backend \
@@ -36,6 +45,9 @@ jobs:
 
   deploy-frontend:
     runs-on: ubuntu-latest
+    # Only runs when Vercel secrets are configured.
+    # Set these in: GitHub Repo → Settings → Secrets → Actions
+    if: ${{ secrets.VERCEL_TOKEN != '' }}
 
     steps:
       - name: Checkout code
@@ -49,3 +61,4 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           working-directory: ./frontend
           vercel-args: "--prod"
+
