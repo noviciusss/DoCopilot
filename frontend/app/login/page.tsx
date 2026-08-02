@@ -6,15 +6,16 @@ import { useAuth } from "../../lib/hooks/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { isLoggedIn, loading, error, login, register } = useAuth();
+  const { isLoggedIn, isHydrated, loading, error, login, register } = useAuth();
   const [mode, setMode]         = useState<"login" | "register">("login");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
 
-  // Redirect to home if already logged in
+  // Redirect to home if already logged in (only after hydration completes)
   useEffect(() => {
-    if (isLoggedIn) router.push("/");
-  }, [isLoggedIn, router]);
+    if (isHydrated && isLoggedIn) router.push("/");
+  }, [isLoggedIn, isHydrated, router]);
+
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

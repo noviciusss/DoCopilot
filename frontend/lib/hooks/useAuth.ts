@@ -3,13 +3,23 @@ import { useState, useEffect, useCallback } from "react";
 import { apiLogin, apiRegister } from "../api";
 
 export function useAuth() {
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Initialize token directly from localStorage if in browser environment
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("docopilot_token");
+    }
+    return null;
+  });
 
-  // Rehydrate JWT from localStorage on mount
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+
+  // Sync token on mount and mark as hydrated
   useEffect(() => {
-    setToken(localStorage.getItem("docopilot_token"));
+    const storedToken = localStorage.getItem("docopilot_token");
+    setToken(storedToken);
+    setIsHydrated(true);
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
@@ -50,5 +60,14 @@ export function useAuth() {
     setToken(null);
   }, []);
 
-  return { isLoggedIn: !!token, token, loading, error, login, register, logout };
+  return {
+    isLoggedIn: !!token,
+    token,
+    isHydrated,
+    loading: loading || !isHydrated,
+    error,
+    login,
+    register,
+    logout
+  };
 }

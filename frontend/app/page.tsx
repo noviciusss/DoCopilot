@@ -28,7 +28,7 @@ const UPLOAD_BTN: Record<IngestionStatus, string> = {
 
 export default function Home() {
   const router  = useRouter();
-  const { isLoggedIn, loading: authLoading, logout } = useAuth();
+  const { isLoggedIn, isHydrated, logout } = useAuth();
 
   const { status: ingestionStatus, documentId, error: uploadError, upload, clearDocument } = useUpload();
 
@@ -43,10 +43,11 @@ export default function Home() {
   const cancelStreamRef = useRef<(() => void) | null>(null);
   const answerRef = useRef<HTMLDivElement>(null);
 
-  // Redirect to /login if not authenticated (after auth state resolves)
+  // Redirect to /login if not authenticated (only after hydration completes)
   useEffect(() => {
-    if (!authLoading && !isLoggedIn) router.push("/login");
-  }, [isLoggedIn, authLoading, router]);
+    if (isHydrated && !isLoggedIn) router.push("/login");
+  }, [isLoggedIn, isHydrated, router]);
+
 
   // Auto-scroll answer into view while streaming
   useEffect(() => {
@@ -100,14 +101,15 @@ export default function Home() {
     setSources([]);
   };
 
-  // Show loading state while auth resolves to prevent flash of redirect
-  if (authLoading) {
+  // Show loading spinner while auth hydration completes to prevent flash of redirect
+  if (!isHydrated) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <span className="inline-block h-6 w-6 rounded-full border-2 border-zinc-500 border-t-transparent animate-spin" />
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-zinc-800 selection:text-white">
