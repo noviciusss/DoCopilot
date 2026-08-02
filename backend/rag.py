@@ -94,12 +94,10 @@ def get_embeddings():
     if _embeddings is None:
         _load_start = time.time()
 
-        # In CI, sentence-transformers is installed locally (requirements-dev.txt).
-        # On Render free tier, it is NOT installed to stay under the 512MB RAM limit;
-        # instead we use the remote HuggingFace Inference API (no RAM cost).
+        # 1. Try sentence-transformers (CI / full dev environment)
         try:
-            import sentence_transformers  # noqa: F401 — presence check only
-            logger.info("sentence-transformers detected — using local embeddings (CI mode).")
+            import sentence_transformers  # noqa: F401
+            logger.info("sentence-transformers detected — using local embeddings.")
             from langchain_huggingface import HuggingFaceEmbeddings
             _embeddings = HuggingFaceEmbeddings(
                 model_name="sentence-transformers/all-MiniLM-L6-v2",
@@ -107,21 +105,27 @@ def get_embeddings():
                 encode_kwargs={"normalize_embeddings": True, "batch_size": 32},
             )
             _embeddings.embed_query("warmup")
-        except ImportError:
-            logger.info("sentence-transformers not installed — using HuggingFace Inference API (production mode).")
-            from langchain_huggingface import HuggingFaceEndpointEmbeddings
-            raw_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
-            hf_token = raw_token.strip() if raw_token else None
-            if not hf_token:
-                logger.warning("HF_TOKEN is not set. HuggingFace Inference API calls may be rate-limited.")
-            _embeddings = HuggingFaceEndpointEmbeddings(
-                model="sentence-transformers/all-MiniLM-L6-v2",
-                task="feature-extraction",
-                huggingfacehub_api_token=hf_token,
-            )
+        except Exception:
+            # 2. Try FastEmbed (lightweight ONNX local embeddings, no HuggingFace API key required)
+            try:
+                logger.info("sentence-transformers unavailable — using FastEmbed (ONNX local mode).")
+                from langchain_community.embeddings import FastEmbedEmbeddings
+                _embeddings = FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
+                _embeddings.embed_query("warmup")
+            except Exception as fe_err:
+                logger.info("FastEmbed unavailable (%s) — falling back to HuggingFace Endpoint API.", fe_err)
+                from langchain_huggingface import HuggingFaceEndpointEmbeddings
+                raw_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
+                hf_token = raw_token.strip() if raw_token else None
+                _embeddings = HuggingFaceEndpointEmbeddings(
+                    model="sentence-transformers/all-MiniLM-L6-v2",
+                    task="feature-extraction",
+                    huggingfacehub_api_token=hf_token,
+                )
 
         logger.info("Embedding model ready in %.2fs", time.time() - _load_start)
     return _embeddings
+
 
 def get_sparse_embeddings():
     global _sparse_embeddings
@@ -507,8 +511,10 @@ Answer (bullets):
     if not groq_api_key:
         raise ValueError("GROQ_API_KEY is not set. Please add it to your .env file.")
     from langchain_groq import ChatGroq
-    llm = ChatGroq(model="meta-llama/llama-prompt-guard-2-86m", temperature=0, api_key=groq_api_key)
+    model_name = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    llm = ChatGroq(model=model_name, temperature=0, api_key=groq_api_key)
     response = llm.invoke(final_prompt)
+
 
     answer = getattr(response, "text", None) or getattr(response, "content", str(response))
     sources = list(set(doc.metadata.get("source", "") for doc in retrieved_docs))
@@ -616,7 +622,9 @@ Answer (bullets):
         return
 
     from langchain_groq import ChatGroq
-    llm = ChatGroq(model="qwen/qwen3-32b", temperature=0, api_key=groq_api_key)
+    model_name = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    llm = ChatGroq(model=model_name, temperature=0, api_key=groq_api_key)
+
     sources = list(set(doc.metadata.get("source", "") for doc in retrieved_docs))
 
     # Step 4: Stream tokens
