@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.db.session import get_db
+from backend.db.session import get_db, engine, Base
 from backend.db import crud
 from backend.db.models import User
 from backend.auth.security import hash_password, verify_password, create_access_token
@@ -26,6 +26,7 @@ class AuthTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user_id: str
+    email: str
     tenant_id: str
 
 class UserProfileResponse(BaseModel):
@@ -40,8 +41,9 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """Registers new user and automatically provisions a primary default workspace/tenant."""
     if len(body.password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
-        
+
     existing_user = await crud.get_user_by_email(db, body.email)
+
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
@@ -64,8 +66,10 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         access_token=token,
         token_type="bearer",
         user_id=str(user.id),
+        email=user.email,
         tenant_id=str(tenant.id)
     )
+
 
 @router.post("/login", response_model=AuthTokenResponse)
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
@@ -94,8 +98,10 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         access_token=token,
         token_type="bearer",
         user_id=str(user.id),
+        email=user.email,
         tenant_id=str(primary_membership.tenant_id)
     )
+
 
 @router.get("/me", response_model=UserProfileResponse)
 async def get_me(context: TenantContext = Depends(get_tenant_context)):

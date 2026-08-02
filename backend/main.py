@@ -144,9 +144,19 @@ def _coerce_upload(value: Any) -> UploadFile | None:
 
 # Endpoints
 
+@app.get("/")
+async def root():
+    return {
+        "title": "DoCopilot API",
+        "version": "2.1.0",
+        "status": "online",
+        "docs": "/docs"
+    }
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
 
 @app.get("/readyz")
 async def readiness_check(db: AsyncSession = Depends(get_db)):
