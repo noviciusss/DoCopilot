@@ -43,6 +43,16 @@ jobs:
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_NAME }}.azurecr.io/docopilot-backend:${{ github.sha }}
 
+      # Purge old images from ACR — keeps only the 3 most recent.
+      # ACR Basic SKU charges ~$0.10/GB/month. Old layers accumulate fast.
+      - name: Purge old ACR images (keep last 3)
+        run: |
+          az acr run \
+            --registry ${{ secrets.ACR_NAME }} \
+            --cmd "acr purge --filter 'docopilot-backend:.*' --ago 7d --keep 3 --untagged" \
+            /dev/null || true
+
+
   deploy-frontend:
     runs-on: ubuntu-latest
     # Only runs when Vercel secrets are configured.
