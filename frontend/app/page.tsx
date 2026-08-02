@@ -1,13 +1,14 @@
-﻿"use client";
+"use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+import { useAuth } from "../lib/hooks/useAuth";
+import { useUpload, UPLOAD_STATUS_LABELS, IngestionStatus } from "../lib/hooks/useUpload";
+import { apiStreamChat } from "../lib/api";
 
 type UploadType = "pdf" | "txt" | "text";
-type UploadResponse = { document_id: string };
 
 const TABS: { id: UploadType; label: string; hint: string }[] = [
   { id: "pdf",  label: "PDF",        hint: "Upload a PDF document" },
@@ -15,139 +16,102 @@ const TABS: { id: UploadType; label: string; hint: string }[] = [
   { id: "text", label: "Paste Text", hint: "Paste text directly" },
 ];
 
+// Maps ingestion status to button label
+const UPLOAD_BTN: Record<IngestionStatus, string> = {
+  idle:      "Index Source",
+  uploading: "Sending…",
+  queued:    "Queued…",
+  running:   "Embedding…",
+  succeeded: "Re-index",
+  failed:    "Retry",
+};
+
 export default function Home() {
-  const [uploadType, setUploadType]       = useState<UploadType>("pdf");
-  const [file, setFile]                   = useState<File | null>(null);
-  const [plainText, setPlainText]         = useState("");
-  const [uploadStatus, setUploadStatus]   = useState<{ msg: string; ok: boolean } | null>(null);
-  const [documentId, setDocumentId]       = useState("");
+  const router  = useRouter();
+  const { isLoggedIn, loading: authLoading, logout } = useAuth();
+
+  const { status: ingestionStatus, documentId, error: uploadError, upload, clearDocument } = useUpload();
+
+  const [uploadType, setUploadType] = useState<UploadType>("pdf");
+  const [file, setFile]             = useState<File | null>(null);
+  const [plainText, setPlainText]   = useState("");
+
   const [question, setQuestion]           = useState("");
   const [streamingAnswer, setStreamingAnswer] = useState("");
   const [sources, setSources]             = useState<string[]>([]);
-  const [isUploading, setIsUploading]     = useState(false);
   const [isAsking, setIsAsking]           = useState(false);
+  const cancelStreamRef = useRef<(() => void) | null>(null);
   const answerRef = useRef<HTMLDivElement>(null);
 
-  const askDisabled = useMemo(
-    () => !documentId || !question.trim() || isAsking,
-    [documentId, question, isAsking]
-  );
-
-  // Restore document_id from sessionStorage on mount (Task 4.2)
+  // Redirect to /login if not authenticated (after auth state resolves)
   useEffect(() => {
-    const saved = sessionStorage.getItem("document_id");
-    if (saved) setDocumentId(saved);
-  }, []);
+    if (!authLoading && !isLoggedIn) router.push("/login");
+  }, [isLoggedIn, authLoading, router]);
 
-  // Auto-scroll answer section into view while streaming
+  // Auto-scroll answer into view while streaming
   useEffect(() => {
     if (streamingAnswer && answerRef.current) {
       answerRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }, [streamingAnswer]);
 
+  const askDisabled = useMemo(
+    () => !documentId || ingestionStatus !== "succeeded" || !question.trim() || isAsking,
+    [documentId, ingestionStatus, question, isAsking]
+  );
+
   const handleUpload = async (evt: FormEvent<HTMLFormElement>) => {
     evt.preventDefault();
-    const body = new FormData();
-
-    if (uploadType === "pdf" || uploadType === "txt") {
-      if (!file) {
-        setUploadStatus({ msg: `Please choose a ${uploadType.toUpperCase()} file first.`, ok: false });
-        return;
-      }
-      body.append(uploadType === "pdf" ? "pdf_file" : "txt_file", file);
-    } else {
-      if (!plainText.trim()) {
-        setUploadStatus({ msg: "Please paste some text first.", ok: false });
-        return;
-      }
-      body.append("plain_text", plainText);
-    }
-
-    setIsUploading(true);
-    setUploadStatus({ msg: "Uploading & indexing…", ok: true });
-
-    try {
-      const res = await fetch(`${API_BASE}/upload`, { method: "POST", body });
-      if (!res.ok) throw new Error((await res.text()) || "Upload failed");
-      const data = (await res.json()) as UploadResponse;
-      sessionStorage.setItem("document_id", data.document_id);
-      setDocumentId(data.document_id);
-      setUploadStatus({ msg: "Indexed successfully — ready to chat.", ok: true });
-    } catch (e) {
-      setUploadStatus({ msg: String(e) || "Upload failed.", ok: false });
-    } finally {
-      setIsUploading(false);
-    }
+    if (uploadType !== "text" && !file) return;
+    if (uploadType === "text" && !plainText.trim()) return;
+    await upload(file, plainText, uploadType);
   };
 
-  // Streaming chat using fetch + ReadableStream (Task 4.1)
   const handleChat = async (evt: FormEvent<HTMLFormElement>) => {
     evt.preventDefault();
-    if (askDisabled) return;
+    if (askDisabled || !documentId) return;
 
     setIsAsking(true);
     setStreamingAnswer("");
     setSources([]);
 
-    try {
-      const res = await fetch(`${API_BASE}/chat/stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, document_id: documentId || null }),
-      });
-
-      if (!res.ok) throw new Error("Chat request failed");
-      if (!res.body)  throw new Error("No response body");
-
-      const reader  = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const parts = buf.split("\n\n");
-        buf = parts.pop() ?? "";
-
-        for (const part of parts) {
-          if (!part.startsWith("data: ")) continue;
-          try {
-            const ev = JSON.parse(part.slice(6));
-            if (ev.done) {
-              setSources(ev.sources ?? []);
-              if (ev.answer) setStreamingAnswer(ev.answer);
-            } else if (ev.token) {
-              setStreamingAnswer((prev) => prev + ev.token);
-            } else if (ev.error) {
-              setStreamingAnswer("⚠ " + ev.error);
-            }
-          } catch {
-            // malformed SSE chunk — ignore
-          }
-        }
+    cancelStreamRef.current = apiStreamChat(
+      question,
+      documentId,
+      (token) => setStreamingAnswer((prev) => prev + token),
+      (srcs, fullAns) => {
+        setSources(srcs);
+        if (fullAns) setStreamingAnswer(fullAns);
+        setIsAsking(false);
+      },
+      (err) => {
+        setStreamingAnswer("⚠ " + err);
+        setIsAsking(false);
       }
-    } catch (e) {
-      setStreamingAnswer("Something went wrong — check the backend server.");
-    } finally {
-      setIsAsking(false);
-    }
+    );
   };
 
   const handleClearSession = () => {
-    sessionStorage.removeItem("document_id");
-    setDocumentId("");
-    setUploadStatus(null);
+    cancelStreamRef.current?.();
+    clearDocument();
     setFile(null);
     setPlainText("");
     setStreamingAnswer("");
     setSources([]);
   };
 
+  // Show loading state while auth resolves to prevent flash of redirect
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <span className="inline-block h-6 w-6 rounded-full border-2 border-zinc-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-zinc-800 selection:text-white">
-      
+
       {/* ── Header / Navigation ──────────────────────────────────── */}
       <nav className="sticky top-0 z-20 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
@@ -162,11 +126,19 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-4">
-            {documentId ? (
+            {/* Ingestion status badge */}
+            {ingestionStatus === "running" || ingestionStatus === "queued" ? (
+              <span className="flex items-center gap-1.5 text-xs text-amber-400 font-mono">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                {ingestionStatus === "queued" ? "Queued" : "Indexing…"}
+              </span>
+            ) : null}
+
+            {documentId && ingestionStatus === "succeeded" ? (
               <div className="flex items-center gap-3">
                 <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="hidden sm:inline-block font-mono text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded-md">
-                  Active ID: {documentId.slice(0, 8)}...{documentId.slice(-8)}
+                  Active ID: {documentId.slice(0, 8)}…{documentId.slice(-8)}
                 </span>
                 <button
                   type="button"
@@ -182,37 +154,38 @@ export default function Home() {
                 No active document
               </span>
             )}
+
+            {/* Logout */}
+            <button
+              onClick={logout}
+              className="text-xs text-zinc-500 hover:text-zinc-300 border border-zinc-800 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Sign out
+            </button>
           </div>
         </div>
       </nav>
 
-      {/* ── Main Layout (Dashboard Grid) ─────────────────────────── */}
+      {/* ── Main Layout ────────────────────────────────────────────── */}
       <main className="mx-auto max-w-6xl w-full px-6 py-10 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Left Column (Upload & Settings Control Panel) - 5 Cols */}
+
+        {/* Left Column — Upload & Settings */}
         <section className="lg:col-span-5 space-y-6">
           <div className="space-y-1">
-            <h1 className="text-xl font-medium tracking-tight text-zinc-200">
-              Document Workspace
-            </h1>
+            <h1 className="text-xl font-medium tracking-tight text-zinc-200">Document Workspace</h1>
             <p className="text-xs text-zinc-500">
               Select or paste document sources to index them into Qdrant hybrid vector store.
             </p>
           </div>
 
-          {/* Upload Settings Card */}
           <div className="rounded-2xl border border-zinc-900 bg-zinc-900/40 backdrop-blur-sm p-6 space-y-6 transition-all duration-300 hover:border-zinc-800">
-            {/* Tab Swappers */}
+            {/* Type tabs */}
             <div className="flex gap-1.5 rounded-xl bg-zinc-950 p-1 border border-zinc-900">
               {TABS.map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => { 
-                    setUploadType(tab.id); 
-                    setFile(null); 
-                    setUploadStatus(null); 
-                  }}
+                  onClick={() => { setUploadType(tab.id); setFile(null); }}
                   className={`flex-1 text-center py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
                     uploadType === tab.id
                       ? "bg-zinc-900 text-zinc-100 shadow-sm border border-zinc-800/80"
@@ -224,7 +197,6 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Input fields based on selection */}
             <form onSubmit={handleUpload} className="space-y-5">
               {uploadType === "text" ? (
                 <div className="space-y-1.5">
@@ -245,16 +217,12 @@ export default function Home() {
                     </label>
                     <span className="text-[10px] text-zinc-600 uppercase font-mono">Max 20MB</span>
                   </div>
-                  
-                  {/* File zone styling */}
+
                   <div className="border border-dashed border-zinc-800 hover:border-zinc-700 transition-colors rounded-xl bg-zinc-950/40 p-6 flex flex-col items-center justify-center text-center cursor-pointer group relative">
                     <input
                       type="file"
                       accept={uploadType === "pdf" ? "application/pdf" : "text/plain,.txt"}
-                      onChange={(e) => { 
-                        setFile(e.target.files?.[0] ?? null); 
-                        setUploadStatus(null); 
-                      }}
+                      onChange={(e) => { setFile(e.target.files?.[0] ?? null); }}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     />
                     <svg className="w-8 h-8 text-zinc-600 group-hover:text-zinc-500 transition-colors mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -272,29 +240,36 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Action area */}
               <div className="space-y-3 pt-2">
                 <button
                   type="submit"
-                  disabled={isUploading}
+                  disabled={ingestionStatus === "uploading" || ingestionStatus === "queued" || ingestionStatus === "running"}
                   className="w-full rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 font-semibold py-2.5 text-xs transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {isUploading ? (
+                  {(ingestionStatus === "uploading" || ingestionStatus === "queued" || ingestionStatus === "running") ? (
                     <>
                       <span className="inline-block h-3.5 w-3.5 rounded-full border-2 border-zinc-950 border-t-transparent animate-spin" />
-                      Indexing Data...
+                      {UPLOAD_BTN[ingestionStatus]}
                     </>
-                  ) : "Index Source"}
+                  ) : UPLOAD_BTN[ingestionStatus]}
                 </button>
 
-                {uploadStatus && (
+                {/* Ingestion status message */}
+                {ingestionStatus !== "idle" && (
                   <div className={`p-3 rounded-lg border text-xs flex items-start gap-2 ${
-                    uploadStatus.ok 
-                      ? "bg-emerald-950/20 border-emerald-900/60 text-emerald-350" 
-                      : "bg-red-950/20 border-red-900/60 text-red-350"
+                    ingestionStatus === "succeeded"
+                      ? "bg-emerald-950/20 border-emerald-900/60 text-emerald-350"
+                      : ingestionStatus === "failed"
+                      ? "bg-red-950/20 border-red-900/60 text-red-350"
+                      : "bg-amber-950/20 border-amber-900/60 text-amber-300"
                   }`}>
-                    <span className={`h-1.5 w-1.5 rounded-full mt-1.5 ${uploadStatus.ok ? "bg-emerald-400" : "bg-red-400"}`} />
-                    <span className="flex-1">{uploadStatus.msg}</span>
+                    <span className={`h-1.5 w-1.5 rounded-full mt-1.5 flex-shrink-0 ${
+                      ingestionStatus === "succeeded" ? "bg-emerald-400" :
+                      ingestionStatus === "failed" ? "bg-red-400" : "bg-amber-400 animate-pulse"
+                    }`} />
+                    <span className="flex-1">
+                      {uploadError ?? UPLOAD_STATUS_LABELS[ingestionStatus]}
+                    </span>
                   </div>
                 )}
               </div>
@@ -302,18 +277,15 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Right Column (Ask & Answers Workspace) - 7 Cols */}
+        {/* Right Column — Chat */}
         <section className="lg:col-span-7 flex flex-col space-y-6">
           <div className="space-y-1">
-            <h1 className="text-xl font-medium tracking-tight text-zinc-200">
-              Copilot Chat
-            </h1>
+            <h1 className="text-xl font-medium tracking-tight text-zinc-200">Copilot Chat</h1>
             <p className="text-xs text-zinc-500">
               Ask questions backed by semantic context extraction, BM25, and hybrid re-ranking.
             </p>
           </div>
 
-          {/* Chat card */}
           <div className="rounded-2xl border border-zinc-900 bg-zinc-900/40 backdrop-blur-sm p-6 space-y-6 transition-all duration-300 hover:border-zinc-800">
             <form onSubmit={handleChat} className="space-y-4">
               <div className="relative">
@@ -321,14 +293,18 @@ export default function Home() {
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   rows={3}
-                  placeholder={documentId ? "Ask a question about the document..." : "Please upload a document to unlock the chat console"}
-                  disabled={!documentId}
+                  placeholder={
+                    ingestionStatus === "succeeded"
+                      ? "Ask a question about the document..."
+                      : "Upload and index a document to unlock chat"
+                  }
+                  disabled={ingestionStatus !== "succeeded"}
                   className="w-full rounded-xl border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-xs text-zinc-150 placeholder:text-zinc-600 outline-none focus:border-zinc-700 transition-colors resize-none disabled:opacity-40 disabled:cursor-not-allowed shadow-inner"
                 />
               </div>
 
               <div className="flex justify-between items-center">
-                <span className="text-[10px] text-zinc-600 font-mono">Rate Limit: 10 / min</span>
+                <span className="text-[10px] text-zinc-600 font-mono">Rate Limit: 20 / min</span>
                 <button
                   type="submit"
                   disabled={askDisabled}
@@ -337,7 +313,7 @@ export default function Home() {
                   {isAsking ? (
                     <>
                       <span className="inline-block h-3.5 w-3.5 rounded-full border-2 border-zinc-950 border-t-transparent animate-spin" />
-                      Synthesizing...
+                      Synthesizing…
                     </>
                   ) : "Submit Query"}
                 </button>
@@ -345,7 +321,7 @@ export default function Home() {
             </form>
           </div>
 
-          {/* Answer Area - Rendered conditionally */}
+          {/* Answer Area */}
           {(streamingAnswer || isAsking) && (
             <div ref={answerRef} className="rounded-2xl border border-zinc-900 bg-zinc-900/40 backdrop-blur-sm p-6 space-y-6 transition-all duration-300 hover:border-zinc-800">
               <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
@@ -353,9 +329,7 @@ export default function Home() {
                   <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
                     Response Output
                   </h2>
-                  {isAsking && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-pulse" />
-                  )}
+                  {isAsking && <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-pulse" />}
                 </div>
                 <span className="text-[10px] font-mono text-zinc-600 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-900">SSE Streamed</span>
               </div>
@@ -406,7 +380,7 @@ export default function Home() {
             </div>
           )}
         </section>
-        
+
       </main>
 
       {/* Footer */}
