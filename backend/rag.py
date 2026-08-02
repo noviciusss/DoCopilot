@@ -21,6 +21,7 @@ from langsmith.run_helpers import traceable
 
 ###Basic guadrail functions 
 from backend.ragguardrails import RagGuardrails
+from backend.observability.timing import timed_stage, estimate_token_cost
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -515,31 +516,38 @@ Answer (bullets):
     return answer, sources
 
 # ============================================
-async def query_document(document_id: str, question: str, tenant_id: str = "default") -> dict:
-    """Query a document with guradrails checks
-    """
-    ##input check
-    is_safe,message = RagGuardrails.check_input(question)
+async def query_document(question, document_id=None, tenant_id="default", request_id=None) -> dict:
+    """Query a document with guardrails checks and observability timing."""
+    # Input guardrail check
+    is_safe, message = RagGuardrails.check_input(question)
     if not is_safe:
-        return {"answer": message,
-                "blocked":True,
-                "sources":[]}
+        return {"answer": message, "blocked": True, "sources": []}
 
-    try : 
-        answer,sources = ask_question(question,document_id=document_id,tenant_id=tenant_id)
-        _,cleaned_answer = RagGuardrails.check_output(answer,sources)
+    try:
+        async with timed_stage("rag_pipeline", request_id=request_id, tenant_id=tenant_id):
+            answer, sources = ask_question(question, document_id=document_id, tenant_id=tenant_id)
+
+        _, cleaned_answer = RagGuardrails.check_output(answer, sources)
         
-        return {"answer":cleaned_answer,
-                "blocked":False,
-                "sources":sources}
+        # Log estimated token cost for observability
+        input_tokens = len(question.split()) * 4
+        output_tokens = len(cleaned_answer.split()) * 4
+        cost = estimate_token_cost(input_tokens, output_tokens)
+        logger.info(
+            "Query cost estimate",
+            extra={
+                "request_id": request_id,
+                "tenant_id": tenant_id,
+                "estimated_cost_usd": cost,
+                "token_count": input_tokens + output_tokens,
+            }
+        )
+
+
+        return {"answer": cleaned_answer, "blocked": False, "sources": sources}  # ✅ real sources
+
     except Exception as e:
-        logger.error("Query failed: %s", str(e))
-        return {
-            "answer":  f"Error processing the query: {str(e)}",
-            "blocked": False,
-            "sources": []
-        }
-            
+        return {"answer": f"Error: {str(e)}", "blocked": False, "sources": []}
 
 # ============================================
 # STREAMING QA FUNCTION

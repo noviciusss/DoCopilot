@@ -14,6 +14,13 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+from sqlalchemy import select, func
+from backend.db.models import IngestionJob, EvaluationRun
+
+import uuid as _uuid
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+from backend.observability.logger import setup_structured_logging
 
 from backend.db.session import get_db, engine, Base
 from backend.auth.router import router as auth_router
@@ -30,7 +37,7 @@ from backend.ragguardrails import RagGuardrails
 from backend.db import crud
 from backend.ingestion.validators import calculate_checksum, validate_file_size, check_idempotency
 from backend.ingestion.tasks import _process_ingestion, process_document_task
-from backend.db.models import IngestionJob
+
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -50,12 +57,20 @@ logger = logging.getLogger(__name__)
 # Include Auth Router
 app.include_router(auth_router)
 
+# Call once at module level — sets up JSON logging for the entire app
+setup_structured_logging(level=os.getenv("LOG_LEVEL", "INFO"))
+
+
 # Database table creation on startup for dev (or use alembic upgrade head in production)
 @app.on_event("startup")
 async def startup_event():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database models verified / initialized.")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database models verified / initialized.")
+    except Exception as e:
+        logger.warning("Database initialization on startup skipped / connection failed: %s", e)
+
 
 # CORS Setup
 raw_origins = os.getenv("ALLOWED_ORIGINS", "*").strip()
@@ -67,6 +82,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Request ID Middleware — attaches a unique UUID to every request for log correlation
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Enables tracing a single request across all log lines it produces."""
+    async def dispatch(self, request: StarletteRequest, call_next):
+        import time as _time
+        request_id = str(_uuid.uuid4())
+        request.state.request_id = request_id
+        start = _time.perf_counter()
+        logger.info("Request started", extra={"request_id": request_id, "endpoint": str(request.url.path), "method": request.method})
+        response = await call_next(request)
+        elapsed_ms = round((_time.perf_counter() - start) * 1000, 2)
+        logger.info("Request completed", extra={"request_id": request_id, "endpoint": str(request.url.path), "status_code": response.status_code, "latency_ms": elapsed_ms})
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+
+app.add_middleware(RequestIDMiddleware)
 
 # Models
 class UploadResponse(BaseModel):
@@ -97,6 +131,7 @@ class IngestionJobStatusResponse(BaseModel):
     failure_reason: Optional[str] = None
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
+
 
 def _coerce_upload(value: Any) -> UploadFile | None:
     if value is None:
@@ -301,3 +336,32 @@ async def chat_stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+@app.get("/metrics")
+async def get_system_metrics(
+    context: TenantContext = Depends(get_tenant_context),
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """
+    Admin-facing endpoint returning aggregate system health metrics.
+    Useful for a simple internal dashboard or health monitoring script.
+    """
+  
+    # Job status counts
+    job_counts = await db.execute(
+        select(IngestionJob.status, func.count(IngestionJob.id))
+        .group_by(IngestionJob.status)
+    )
+    job_summary = {row[0]: row[1] for row in job_counts}
+    # Most recent eval run metrics
+    latest_eval = await db.execute(
+        select(EvaluationRun)
+        .order_by(EvaluationRun.created_at.desc())
+        .limit(1)
+    )
+    eval_row = latest_eval.scalar_one_or_none()
+    latest_metrics = eval_row.metrics if eval_row else {}
+    return {
+        "ingestion_jobs": job_summary,
+        "latest_evaluation": latest_metrics,
+        "system": "healthy"
+    }

@@ -6,7 +6,9 @@ import dotenv
 dotenv.load_dotenv(dotenv.find_dotenv())
 
 from langchain_groq import ChatGroq
-from rag import index_get_pdf, ask_question
+from backend.rag import index_get_pdf, ask_question
+
+
 
 # LLM for evaluation ///  We can use embeddings similarity too its faster and no extra calls but less accurate
 eval_llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
