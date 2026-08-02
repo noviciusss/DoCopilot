@@ -64,6 +64,8 @@ logger.info("Qdrant storage path: %s", QDRANT_PATH)
 _qdrant_client: Optional[QdrantClient] = None
 
 QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_HOST = os.getenv("QDRANT_HOST")
+QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 
 def _get_qdrant_client() -> QdrantClient:
@@ -71,18 +73,44 @@ def _get_qdrant_client() -> QdrantClient:
     global _qdrant_client
     if _qdrant_client is None:
         from qdrant_client import QdrantClient
+        
+        # 1. Explicit QDRANT_URL (production / Azure / cloud)
         if QDRANT_URL:
             logger.info("Connecting to Qdrant server at: %s", QDRANT_URL)
             _qdrant_client = QdrantClient(
                 url=QDRANT_URL,
                 api_key=QDRANT_API_KEY if QDRANT_API_KEY else None,
-                timeout=120.0  # Set a generous timeout (120s) to avoid write timeouts
+                timeout=120.0
             )
+        # 2. Explicit QDRANT_HOST
+        elif QDRANT_HOST:
+            logger.info("Connecting to Qdrant host at: %s:%d", QDRANT_HOST, QDRANT_PORT)
+            _qdrant_client = QdrantClient(
+                host=QDRANT_HOST,
+                port=QDRANT_PORT,
+                api_key=QDRANT_API_KEY if QDRANT_API_KEY else None,
+                timeout=120.0
+            )
+        # 3. Check if local Qdrant server is running on http://localhost:6333
         else:
-            logger.info("Using local Qdrant directory: %s", QDRANT_PATH)
-            _qdrant_client = QdrantClient(path=QDRANT_PATH)
-        logger.info("Qdrant client created")
+            try:
+                logger.info("Checking for running Qdrant server at http://localhost:6333...")
+                client_temp = QdrantClient(url="http://localhost:6333", timeout=3.0)
+                client_temp.get_collections()
+                _qdrant_client = client_temp
+                logger.info("Connected to running Qdrant server at http://localhost:6333")
+            except Exception:
+                # 4. Fallback to local directory mode if no server is listening
+                logger.info("Qdrant server not detected. Attempting local directory: %s", QDRANT_PATH)
+                try:
+                    _qdrant_client = QdrantClient(path=QDRANT_PATH)
+                except Exception as exc:
+                    logger.warning("Local directory %s locked (%s). Falling back to in-memory Qdrant.", QDRANT_PATH, exc)
+                    _qdrant_client = QdrantClient(location=":memory:")
+                    
+        logger.info("Qdrant client initialized successfully")
     return _qdrant_client
+
 
 
 _embeddings = None
