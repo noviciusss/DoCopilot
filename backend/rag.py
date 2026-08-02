@@ -207,26 +207,16 @@ def create_vector_store(docs: List[Document], collection_name: str = "documents"
     t0 = time.time()
     from langchain_qdrant import QdrantVectorStore, RetrievalMode
     
-    if QDRANT_URL:
-        vectorstore = QdrantVectorStore.from_documents(
-            docs,
-            embedding=get_embeddings(),
-            sparse_embedding=get_sparse_embeddings(),
-            url=QDRANT_URL,
-            api_key=QDRANT_API_KEY if QDRANT_API_KEY else None,
-            timeout=120.0,
-            collection_name=collection_name,
-            retrieval_mode=RetrievalMode.HYBRID,
-        )
-    else:
-        vectorstore = QdrantVectorStore.from_documents(
-            docs,
-            embedding=get_embeddings(),
-            sparse_embedding=get_sparse_embeddings(),
-            path=QDRANT_PATH,
-            collection_name=collection_name,
-            retrieval_mode=RetrievalMode.HYBRID,
-        )
+    client = _get_qdrant_client()
+    vectorstore = QdrantVectorStore.from_documents(
+        docs,
+        embedding=get_embeddings(),
+        sparse_embedding=get_sparse_embeddings(),
+        client=client,
+        collection_name=collection_name,
+        retrieval_mode=RetrievalMode.HYBRID,
+    )
+
     
     # Create keyword payload index for tenant_id filtering
     try:
