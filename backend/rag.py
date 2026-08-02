@@ -206,16 +206,68 @@ def create_vector_store(docs: List[Document], collection_name: str = "documents"
     
     t0 = time.time()
     from langchain_qdrant import QdrantVectorStore, RetrievalMode
-    
-    client = _get_qdrant_client()
-    vectorstore = QdrantVectorStore.from_documents(
-        docs,
-        embedding=get_embeddings(),
-        sparse_embedding=get_sparse_embeddings(),
-        client=client,
-        collection_name=collection_name,
-        retrieval_mode=RetrievalMode.HYBRID,
-    )
+
+    q_url = QDRANT_URL
+    q_host = QDRANT_HOST
+    q_api_key = QDRANT_API_KEY if QDRANT_API_KEY else None
+
+    # Check if local Qdrant server is running at http://localhost:6333
+    if not q_url and not q_host:
+        try:
+            import httpx
+            r = httpx.get("http://localhost:6333", timeout=1.5)
+            if r.status_code == 200:
+                q_url = "http://localhost:6333"
+        except Exception:
+            pass
+
+    if q_url:
+        logger.info("Indexing into Qdrant server URL: %s", q_url)
+        vectorstore = QdrantVectorStore.from_documents(
+            docs,
+            embedding=get_embeddings(),
+            sparse_embedding=get_sparse_embeddings(),
+            url=q_url,
+            api_key=q_api_key,
+            timeout=120.0,
+            collection_name=collection_name,
+            retrieval_mode=RetrievalMode.HYBRID,
+        )
+    elif q_host:
+        logger.info("Indexing into Qdrant host: %s:%d", q_host, QDRANT_PORT)
+        vectorstore = QdrantVectorStore.from_documents(
+            docs,
+            embedding=get_embeddings(),
+            sparse_embedding=get_sparse_embeddings(),
+            host=q_host,
+            port=QDRANT_PORT,
+            api_key=q_api_key,
+            timeout=120.0,
+            collection_name=collection_name,
+            retrieval_mode=RetrievalMode.HYBRID,
+        )
+    else:
+        logger.info("Attempting local Qdrant directory: %s", QDRANT_PATH)
+        try:
+            vectorstore = QdrantVectorStore.from_documents(
+                docs,
+                embedding=get_embeddings(),
+                sparse_embedding=get_sparse_embeddings(),
+                path=QDRANT_PATH,
+                collection_name=collection_name,
+                retrieval_mode=RetrievalMode.HYBRID,
+            )
+        except Exception as exc:
+            logger.warning("Local Qdrant directory %s locked (%s). Using in-memory mode.", QDRANT_PATH, exc)
+            vectorstore = QdrantVectorStore.from_documents(
+                docs,
+                embedding=get_embeddings(),
+                sparse_embedding=get_sparse_embeddings(),
+                location=":memory:",
+                collection_name=collection_name,
+                retrieval_mode=RetrievalMode.HYBRID,
+            )
+
 
     
     # Create keyword payload index for tenant_id filtering
