@@ -358,64 +358,66 @@ def plain_text_chunks(raw_text: str, *, source: str = "user_input") -> List[Docu
 # INDEXING
 # ============================================
 
-def store_document_cache(docs: List[Document], vectorstore: QdrantVectorStore, collection_name: str) -> str:
+def store_document_cache(docs: List[Document], vectorstore: QdrantVectorStore, collection_name: str, document_id: Optional[str] = None) -> str:
     """
     Store vectorstore reference for retrieval.
-    
-    With Qdrant:
-    - Data is persisted on disk automatically (./qdrant_data/)
-    - Survives server restarts
-    - No need to store BM25 index separately (built-in!)
+    Registers under both collection_name and document_id so lookups by Postgres UUID succeed.
     """
     global current_document_id, document_cache
-    document_cache.clear()
     
-    document_id = collection_name
-    
-    document_cache[document_id] = {
+    key_id = document_id or collection_name
+    data = {
         "vectorstore": vectorstore,
         "collection_name": collection_name,
-        "docs": docs,  # Keep for debugging
+        "docs": docs,
     }
     
-    current_document_id = document_id
-    logger.info("Cached document: %s (collection=%s, hybrid=built-in)", document_id, collection_name)
-    return document_id
+    document_cache[key_id] = data
+    document_cache[collection_name] = data
+    
+    current_document_id = key_id
+    logger.info("Cached document: key=%s (collection=%s)", key_id, collection_name)
+    return key_id
 
 
 @traceable(name="index_get_pdf", tags=["indexing"])
-def index_get_pdf(content: bytes, filename: str, tenant_id: str = "default") -> str:
+def index_get_pdf(content: bytes, filename: str, tenant_id: str = "default", document_id: Optional[str] = None) -> str:
     """Index PDF from bytes content."""
     t0 = time.time()
     docs = load_pdf_from_bytes(content, filename)
     for doc in docs:
         doc.metadata["tenant_id"] = tenant_id
-    collection_name = re.sub(r'[^a-zA-Z0-9_]', '_', filename.rsplit('.', 1)[0])[:50]
+    base_name = re.sub(r'[^a-zA-Z0-9_]', '_', filename.rsplit('.', 1)[0])[:30]
+    coll_suffix = document_id.replace('-', '_')[:16] if document_id else str(uuid4())[:8]
+    collection_name = f"doc_{base_name}_{coll_suffix}"
     vectorstore = create_vector_store(docs, collection_name)
-    doc_id = store_document_cache(docs, vectorstore, collection_name)
+    doc_id = store_document_cache(docs, vectorstore, collection_name, document_id=document_id)
     logger.info("Total PDF indexing: %.2fs", time.time() - t0)
     return doc_id
 
 
 @traceable(name="index_get_txt", tags=["indexing"])
-def index_get_txt(text: str, filename: str, tenant_id: str = "default") -> str:
+def index_get_txt(text: str, filename: str, tenant_id: str = "default", document_id: Optional[str] = None) -> str:
     """Index text content directly."""
     docs = load_text_chunks(text, filename)
     for doc in docs:
         doc.metadata["tenant_id"] = tenant_id
-    collection_name = re.sub(r'[^a-zA-Z0-9_]', '_', filename.rsplit('.', 1)[0])[:50]
+    base_name = re.sub(r'[^a-zA-Z0-9_]', '_', filename.rsplit('.', 1)[0])[:30]
+    coll_suffix = document_id.replace('-', '_')[:16] if document_id else str(uuid4())[:8]
+    collection_name = f"doc_{base_name}_{coll_suffix}"
     vectorstore = create_vector_store(docs, collection_name)
-    return store_document_cache(docs, vectorstore, collection_name)
+    return store_document_cache(docs, vectorstore, collection_name, document_id=document_id)
 
 
 @traceable(name="index_get_plain_text", tags=["indexing"])
-def index_get_plain_text(raw_text: str, tenant_id: str = "default") -> str:
+def index_get_plain_text(raw_text: str, tenant_id: str = "default", document_id: Optional[str] = None) -> str:
     docs = plain_text_chunks(raw_text)
     for doc in docs:
         doc.metadata["tenant_id"] = tenant_id
-    collection_name = "plain_text"
+    coll_suffix = document_id.replace('-', '_')[:16] if document_id else str(uuid4())[:8]
+    collection_name = f"plain_text_{coll_suffix}"
     vectorstore = create_vector_store(docs, collection_name)
-    return store_document_cache(docs, vectorstore, collection_name)
+    return store_document_cache(docs, vectorstore, collection_name, document_id=document_id)
 
 
 def get_document_data(document_id: Optional[str] = None) -> dict:
@@ -424,28 +426,99 @@ def get_document_data(document_id: Optional[str] = None) -> dict:
     if not target_id:
         raise ValueError("No document found for the given ID")
         
-    if target_id not in document_cache:
-        # Check if collection exists in Qdrant database to reconstruct vectorstore wrapper
-        if collection_exists(target_id):
-            logger.info("Reconstructing vectorstore for existing collection: %s", target_id)
+    if target_id in document_cache:
+        return document_cache[target_id]
+
+    # Candidate collection names in Qdrant
+    sanitized_id = target_id.replace("-", "_")
+    candidates = [
+        target_id,
+        sanitized_id,
+    ]
+
+    # Look up active qdrant_collection from Postgres DocumentVersion if target_id is a UUID
+    try:
+        import uuid
+        from sqlalchemy import select
+        from backend.db.session import AsyncSessionLocal
+        from backend.db.models import DocumentVersion
+        import asyncio
+
+        async def _lookup_db():
+            async with AsyncSessionLocal() as db:
+                res = await db.execute(
+                    select(DocumentVersion.qdrant_collection)
+                    .where(DocumentVersion.document_id == uuid.UUID(target_id))
+                    .where(DocumentVersion.is_active == True)
+                )
+                return res.scalar_one_or_none()
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    db_coll = pool.submit(lambda: asyncio.run(_lookup_db())).result()
+            else:
+                db_coll = loop.run_until_complete(_lookup_db())
+
+            if db_coll and db_coll not in candidates:
+                candidates.insert(0, db_coll)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    # Search Qdrant for matching collection
+    for coll in candidates:
+        if collection_exists(coll):
+            logger.info("Reconstructing vectorstore for existing collection: %s (target_id=%s)", coll, target_id)
             from langchain_qdrant import QdrantVectorStore, RetrievalMode
             client = _get_qdrant_client()
             vectorstore = QdrantVectorStore(
                 client=client,
-                collection_name=target_id,
+                collection_name=coll,
                 embedding=get_embeddings(),
                 sparse_embedding=get_sparse_embeddings(),
                 retrieval_mode=RetrievalMode.HYBRID,
             )
-            document_cache[target_id] = {
+            data = {
                 "vectorstore": vectorstore,
-                "collection_name": target_id,
-                "docs": [],  # We don't have original docs, but it's not needed for query
+                "collection_name": coll,
+                "docs": [],
             }
-        else:
-            raise ValueError(f"No document/collection found for the given ID: {target_id}")
-            
-    return document_cache[target_id]
+            document_cache[target_id] = data
+            document_cache[coll] = data
+            return data
+
+    # Also list all Qdrant collections to check if any collection contains matching prefix
+    try:
+        client = _get_qdrant_client()
+        all_colls = [c.name for c in client.get_collections().collections]
+        for coll in all_colls:
+            if sanitized_id in coll:
+                logger.info("Found matching collection by substring: %s for target_id %s", coll, target_id)
+                from langchain_qdrant import QdrantVectorStore, RetrievalMode
+                vectorstore = QdrantVectorStore(
+                    client=client,
+                    collection_name=coll,
+                    embedding=get_embeddings(),
+                    sparse_embedding=get_sparse_embeddings(),
+                    retrieval_mode=RetrievalMode.HYBRID,
+                )
+                data = {
+                    "vectorstore": vectorstore,
+                    "collection_name": coll,
+                    "docs": [],
+                }
+                document_cache[target_id] = data
+                document_cache[coll] = data
+                return data
+    except Exception:
+        pass
+
+    raise ValueError(f"No document/collection found for the given ID: {target_id}")
+
 
 
 # ============================================

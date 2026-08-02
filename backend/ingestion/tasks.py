@@ -32,12 +32,13 @@ async def _process_ingestion(job_id_str: str, document_id_str: str, file_bytes: 
             # 2. Execute document indexing into Qdrant
             if is_txt:
                 text_content = file_bytes.decode("utf-8")
-                doc_collection_id = index_get_txt(text_content, filename, tenant_id=tenant_id_str)
+                doc_collection_id = index_get_txt(text_content, filename, tenant_id=tenant_id_str, document_id=document_id_str)
             elif is_plain:
                 text_content = file_bytes.decode("utf-8")
-                doc_collection_id = index_get_plain_text(text_content, tenant_id=tenant_id_str)
+                doc_collection_id = index_get_plain_text(text_content, tenant_id=tenant_id_str, document_id=document_id_str)
             else:
-                doc_collection_id = index_get_pdf(file_bytes, filename, tenant_id=tenant_id_str)
+                doc_collection_id = index_get_pdf(file_bytes, filename, tenant_id=tenant_id_str, document_id=document_id_str)
+
 
             # 3. Create DocumentVersion record
             doc_version = DocumentVersion(
