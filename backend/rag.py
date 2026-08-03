@@ -150,7 +150,7 @@ def get_embeddings():
             _embeddings = HuggingFaceEmbeddings(
                 model_name="sentence-transformers/all-MiniLM-L6-v2",
                 model_kwargs={"device": "cpu"},
-                encode_kwargs={"normalize_embeddings": True, "batch_size": 32},
+                encode_kwargs={"normalize_embeddings": True, "batch_size": 8},
             )
             _embeddings.embed_query("warmup")
         except Exception:
@@ -215,43 +215,27 @@ Answer (bullets):
 
 @traceable(name="create_vector_store")
 def create_vector_store(docs: List["Document"], collection_name: str = "documents") -> "QdrantVectorStore":
-    """Create Qdrant vector store with built-in hybrid search (BM25 + Vector + RRF)."""
+    """Create Qdrant vector store using singleton client to avoid lock collisions."""
     if not docs:
         raise ValueError("No documents provided")
 
     t0 = time.time()
     from langchain_qdrant import QdrantVectorStore, RetrievalMode
 
-    conn_kwargs = _get_qdrant_from_documents_kwargs()
-    is_disk_path = "path" in conn_kwargs
-
-    try:
-        vectorstore = QdrantVectorStore.from_documents(
-            docs,
-            embedding=get_embeddings(),
-            sparse_embedding=get_sparse_embeddings(),
-            collection_name=collection_name,
-            retrieval_mode=RetrievalMode.HYBRID,
-            **conn_kwargs,
-        )
-    except Exception as exc:
-        if is_disk_path:
-            logger.warning("Local Qdrant directory locked (%s). Using in-memory mode.", exc)
-            vectorstore = QdrantVectorStore.from_documents(
-                docs,
-                embedding=get_embeddings(),
-                sparse_embedding=get_sparse_embeddings(),
-                collection_name=collection_name,
-                retrieval_mode=RetrievalMode.HYBRID,
-                location=":memory:",
-            )
-        else:
-            raise
+    client = _get_qdrant_client()
+    vectorstore = QdrantVectorStore.from_documents(
+        docs,
+        embedding=get_embeddings(),
+        sparse_embedding=get_sparse_embeddings(),
+        collection_name=collection_name,
+        retrieval_mode=RetrievalMode.HYBRID,
+        client=client,
+    )
 
     # Create tenant_id payload index for filtering
     try:
         from qdrant_client.models import PayloadSchemaType
-        _get_qdrant_client().create_payload_index(
+        client.create_payload_index(
             collection_name=collection_name,
             field_name="metadata.tenant_id",
             field_schema=PayloadSchemaType.KEYWORD
