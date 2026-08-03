@@ -477,12 +477,14 @@ def get_document_data(document_id: Optional[str] = None) -> dict:
             document_cache[coll] = data
             return data
 
-    # Fallback: substring match across all collections
+    # Fallback: substring match across all collections (full ID, 16-char prefix, or 8-char prefix)
     try:
+        short_8 = target_id[:8]
+        short_16 = sanitized_id[:16]
         all_colls = [c.name for c in client.get_collections().collections]
         for coll in all_colls:
-            if sanitized_id in coll:
-                logger.info("Found matching collection by substring: %s", coll)
+            if sanitized_id in coll or short_16 in coll or short_8 in coll:
+                logger.info("Found matching collection by substring '%s': %s", short_16, coll)
                 vectorstore = QdrantVectorStore(
                     client=client,
                     collection_name=coll,
@@ -494,8 +496,8 @@ def get_document_data(document_id: Optional[str] = None) -> dict:
                 document_cache[target_id] = data
                 document_cache[coll] = data
                 return data
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Fallback substring collection lookup notice: %s", e)
 
     raise ValueError(f"No document/collection found for the given ID: {target_id}")
 
