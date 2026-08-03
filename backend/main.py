@@ -280,6 +280,17 @@ async def get_job_status(
     db: AsyncSession = Depends(get_db)
 ) -> IngestionJobStatusResponse:
     """Poll status of an ingestion job."""
+    # "existing" is a sentinel returned by the idempotency guard — not a real UUID.
+    if job_id == "existing":
+        return IngestionJobStatusResponse(
+            job_id="existing",
+            document_id="",
+            status="succeeded",
+            retry_count=0,
+            failure_reason=None,
+            started_at=None,
+            completed_at=None,
+        )
     try:
         job_uuid = uuid.UUID(job_id)
     except ValueError:
