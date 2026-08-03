@@ -215,27 +215,28 @@ Answer (bullets):
 
 @traceable(name="create_vector_store")
 def create_vector_store(docs: List["Document"], collection_name: str = "documents") -> "QdrantVectorStore":
-    """Create Qdrant vector store using singleton client to avoid lock collisions."""
+    """Create Qdrant vector store with built-in hybrid search (BM25 + Vector + RRF)."""
     if not docs:
         raise ValueError("No documents provided")
 
     t0 = time.time()
     from langchain_qdrant import QdrantVectorStore, RetrievalMode
 
-    client = _get_qdrant_client()
+    conn_kwargs = _get_qdrant_from_documents_kwargs()
     vectorstore = QdrantVectorStore.from_documents(
         docs,
         embedding=get_embeddings(),
         sparse_embedding=get_sparse_embeddings(),
         collection_name=collection_name,
         retrieval_mode=RetrievalMode.HYBRID,
-        client=client,
+        force_recreate=True,
+        **conn_kwargs,
     )
 
     # Create tenant_id payload index for filtering
     try:
         from qdrant_client.models import PayloadSchemaType
-        client.create_payload_index(
+        _get_qdrant_client().create_payload_index(
             collection_name=collection_name,
             field_name="metadata.tenant_id",
             field_schema=PayloadSchemaType.KEYWORD
