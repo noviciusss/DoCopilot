@@ -58,6 +58,33 @@ export async function apiGetJobStatus(jobId: string) {
   return data as { status: string; failure_reason?: string };
 }
 
+// ── Document Library ──────────────────────────────────────────────────────────
+export type DocumentLibraryItem = {
+  id: string;
+  filename: string;
+  file_size_bytes: number;
+  mime_type: string;
+  created_at: string;
+  ingestion_status: string;
+  qdrant_collection: string | null;
+};
+
+export async function apiGetDocuments(myDocs = true): Promise<DocumentLibraryItem[]> {
+  const res = await fetch(`${API_BASE}/documents?my_docs=${myDocs}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to fetch document library");
+  return res.json();
+}
+
+export async function apiDeleteDocument(docId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/documents/${docId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to delete document");
+}
+
 // ── Chat (SSE stream via fetch, supports Bearer header) ───────────────────────
 // Note: Native EventSource does NOT support custom headers, so we use fetch + ReadableStream.
 export function apiStreamChat(

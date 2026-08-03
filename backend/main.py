@@ -123,6 +123,7 @@ class UploadAsyncResponse(BaseModel):
     filename: str
     status: str
     message: str
+
 class IngestionJobStatusResponse(BaseModel):
     job_id: str
     document_id: str
@@ -131,6 +132,18 @@ class IngestionJobStatusResponse(BaseModel):
     failure_reason: Optional[str] = None
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
+
+class DocumentLibraryItem(BaseModel):
+    """Single document entry returned by the Document Library endpoint."""
+    id: str
+    filename: str
+    file_size_bytes: int
+    mime_type: str
+    created_at: str
+    # Latest ingestion status for this document (queued / running / succeeded / failed)
+    ingestion_status: str
+    # Qdrant collection name — needed by the client to chat immediately without re-upload
+    qdrant_collection: Optional[str] = None
 
 
 def _coerce_upload(value: Any) -> UploadFile | None:
@@ -307,6 +320,60 @@ async def get_job_status(
         started_at=job.started_at.isoformat() if job.started_at else None,
         completed_at=job.completed_at.isoformat() if job.completed_at else None
     )
+
+
+@app.get("/documents", response_model=list[DocumentLibraryItem])
+async def list_documents(
+    my_docs: bool = True,
+    context: TenantContext = Depends(get_tenant_context),
+    db: AsyncSession = Depends(get_db)
+) -> list[DocumentLibraryItem]:
+    """
+    Document Library — returns documents for the logged-in tenant.
+    ?my_docs=true  → only your own uploads (default)
+    ?my_docs=false → all documents in the shared workspace/tenant
+    """
+    user_filter = context.user.id if my_docs else None
+    docs = await crud.get_tenant_documents(
+        db,
+        tenant_id=context.tenant_id,
+        created_by_id=user_filter,
+    )
+    result = []
+    for doc in docs:
+        # Find latest ingestion status
+        latest_job = max(doc.ingestion_jobs, key=lambda j: j.id, default=None) if doc.ingestion_jobs else None
+        ing_status = latest_job.status if latest_job else "unknown"
+        # Find active qdrant_collection
+        active_ver = next((v for v in doc.versions if v.is_active), None)
+        result.append(DocumentLibraryItem(
+            id=str(doc.id),
+            filename=doc.filename,
+            file_size_bytes=doc.file_size_bytes,
+            mime_type=doc.mime_type,
+            created_at=doc.created_at.isoformat(),
+            ingestion_status=ing_status,
+            qdrant_collection=active_ver.qdrant_collection if active_ver else None,
+        ))
+    return result
+
+
+@app.delete("/documents/{doc_id}", status_code=204)
+async def delete_document(
+    doc_id: str,
+    context: TenantContext = Depends(get_tenant_context),
+    db: AsyncSession = Depends(get_db)
+):
+    """Soft-delete a document from the library (marks is_deleted=True, does NOT remove Qdrant data)."""
+    try:
+        doc_uuid = uuid.UUID(doc_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid document UUID.")
+    deleted = await crud.soft_delete_document(db, doc_id=doc_uuid, tenant_id=context.tenant_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    await db.commit()
+
 @app.post("/chat", response_model=ChatResponse)
 @limiter.limit("20/minute")
 async def chat(

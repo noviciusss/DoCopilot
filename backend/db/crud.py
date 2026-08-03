@@ -1,7 +1,8 @@
 import uuid
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, desc
+from sqlalchemy.orm import selectinload
 from backend.db.models import User, Tenant, TenantMembership, Document, DocumentVersion, IngestionJob
 
 # User CRUD
@@ -80,6 +81,52 @@ async def create_document(
     db.add(doc)
     await db.flush()
     return doc
+
+async def get_tenant_documents(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    created_by_id: Optional[uuid.UUID] = None,
+    limit: int = 100,
+) -> List[Document]:
+    """
+    Fetch non-deleted documents for a tenant, ordered newest first.
+    When created_by_id is provided, only return that user's documents.
+    Eagerly loads versions and ingestion_jobs so callers can access them
+    without extra DB round trips.
+    """
+    q = (
+        select(Document)
+        .options(
+            selectinload(Document.versions),
+            selectinload(Document.ingestion_jobs),
+        )
+        .where(
+            Document.tenant_id == tenant_id,
+            Document.is_deleted == False,
+        )
+        .order_by(desc(Document.created_at))
+        .limit(limit)
+    )
+    if created_by_id is not None:
+        q = q.where(Document.created_by_id == created_by_id)
+    result = await db.execute(q)
+    return list(result.scalars().all())
+
+async def soft_delete_document(db: AsyncSession, doc_id: uuid.UUID, tenant_id: uuid.UUID) -> bool:
+    """Soft-delete a document (marks is_deleted=True). Returns True if found & updated."""
+    result = await db.execute(
+        select(Document).where(
+            Document.id == doc_id,
+            Document.tenant_id == tenant_id,
+            Document.is_deleted == False,
+        )
+    )
+    doc = result.scalar_one_or_none()
+    if not doc:
+        return False
+    doc.is_deleted = True
+    await db.flush()
+    return True
 
 # Ingestion Job CRUD
 async def create_ingestion_job(db: AsyncSession, document_id: uuid.UUID) -> IngestionJob:

@@ -6,44 +6,198 @@
 
 ## System Architecture
 
-```
-[Client Browser]
-      │
-      ▼
-[Next.js Frontend — Vercel]
-      │ HTTPS (JWT Bearer Token)
-      ▼
-[FastAPI Backend — Azure Container Apps]
-      ├── POST /auth/register   → Bcrypt hash → PostgreSQL users table
-      ├── POST /auth/login      → Verify → Sign JWT (HS256, 24h)
-      │
-      ├── POST /upload          → SHA-256 idempotency check
-      │       │                 → Postgres: Document + IngestionJob (QUEUED)
-      │       └── 202 Accepted  → Background Worker (Celery / BackgroundTasks)
-      │                                 │ QUEUED → RUNNING → SUCCEEDED/FAILED
-      │                                 └── Qdrant: chunk + embed + index
-      │
-      ├── GET  /ingestion/jobs/{id}  → Poll job state
-      │
-      └── POST /chat/stream     → Hybrid Search → Rerank → Groq LLM → SSE stream
-              ├── INPUT  Guardrails: injection detection, length validation
-              └── OUTPUT Guardrails: PII redaction, source grounding check
+```mermaid
+flowchart TD
+    Browser["🌐 Browser\n(Next.js)"] -->|"HTTPS + JWT Bearer"| API
+
+    subgraph Backend ["FastAPI Backend — Azure Container Apps"]
+        API["main.py\nFastAPI App"]
+        Auth["auth/router.py\nJWT Auth"]
+        Upload["POST /upload\nAsync Pipeline"]
+        JobPoll["GET /ingestion/jobs/{id}"]
+        DocLib["GET /documents\nDocument Library"]
+        Chat["POST /chat/stream\nSSE Streaming"]
+        RAG["rag.py\nRAG Pipeline"]
+        Guards["ragguardrails.py\nGuardrails"]
+    end
+
+    subgraph Data ["Data Layer"]
+        PG[("PostgreSQL\nusers/tenants/\ndocuments/jobs")]
+        Qdrant[("Qdrant\nVector DB\ndense + sparse")]
+    end
+
+    subgraph External ["External APIs"]
+        Groq["Groq API\nllama-3.3-70b"]
+        Cohere["Cohere\nRerank API"]
+        LangSmith["LangSmith\nTracing"]
+    end
+
+    API --> Auth
+    API --> Upload
+    API --> JobPoll
+    API --> DocLib
+    API --> Chat
+    Upload --> PG
+    Upload --> RAG
+    DocLib --> PG
+    JobPoll --> PG
+    Chat --> Guards
+    Guards --> RAG
+    RAG --> Qdrant
+    RAG --> Cohere
+    RAG --> Groq
+    RAG --> LangSmith
+    Auth --> PG
 ```
 
-```
-[GitHub: push to main]
-      │
-      ▼
-[GitHub Actions: CI]
-      ├── Postgres + Qdrant service containers
-      ├── pip install requirements
-      ├── Wait for Qdrant readiness (polls /readyz)
-      └── pytest tests/ (unit + integration)
+### Full Request Flow — Chat Query
 
-[GitHub Actions: Deploy — main only]
-      ├── az acr login → docker build → docker push (ACR)
-      └── az containerapp update (rolling zero-downtime deploy)
+```mermaid
+sequenceDiagram
+    participant U as 🌐 Browser
+    participant F as FastAPI
+    participant G as Guardrails
+    participant Q as Qdrant
+    participant C as Cohere Rerank
+    participant L as Groq LLM
+
+    U->>F: POST /chat/stream {question, document_id}
+    F->>G: check_input(question)
+    G-->>F: safe=true
+    F->>Q: hybrid_search(question, top_k=20, tenant_filter)
+    Q-->>F: 20 chunks (dense+sparse+RRF)
+    F->>C: rerank(question, 20 chunks, top_n=5)
+    C-->>F: 5 reranked chunks
+    F->>L: stream(RAG_TEMPLATE + context + question)
+    loop Token streaming
+        L-->>F: token chunk
+        F-->>U: data: {"token": "..."}  (SSE)
+    end
+    F->>G: check_output(full_answer)
+    F-->>U: data: {"done": true, "sources": [...], "answer": "..."}
 ```
+
+### CI/CD Pipeline
+
+```mermaid
+flowchart LR
+    Push["git push\nmain"] --> CI
+
+    subgraph CI ["GitHub Actions: CI"]
+        T1["Start Postgres\n+ Qdrant services"]
+        T2["pip install\nrequirements"]
+        T3["Wait for\nQdrant /readyz"]
+        T4["pytest tests/"]
+        T1 --> T2 --> T3 --> T4
+    end
+
+    T4 -->|"tests pass"| Deploy
+
+    subgraph Deploy ["GitHub Actions: Deploy"]
+        D1["az acr login"]
+        D2["docker build"]
+        D3["docker push ACR"]
+        D4["az containerapp update\n(rolling deploy)"]
+        D1 --> D2 --> D3 --> D4
+    end
+```
+
+---
+
+## Design Decisions
+
+> These are the key architectural choices made in DoCopilot and the reasoning behind each one.
+
+<details>
+<summary><strong>Why Qdrant over FAISS / Pinecone / pgvector?</strong></summary>
+
+| Feature | FAISS | pgvector | Pinecone | **Qdrant** |
+|---|---|---|---|---|
+| Hybrid search | ❌ Manual BM25 | ❌ Manual | ✅ | ✅ Built-in |
+| Persistence | ❌ In-memory | ✅ DB | ✅ Cloud | ✅ Disk/Cloud |
+| Tenant filtering | ❌ Manual | ✅ SQL WHERE | ✅ Metadata | ✅ Payload filter |
+| Self-hosted | ✅ | ✅ | ❌ | ✅ |
+| Lines of code | ~150 for hybrid | ~50 | ~30 | **~20** |
+
+**Decision:** Qdrant provides built-in hybrid search (dense + BM25 + RRF) in a single API call, eliminating ~130 lines of manual BM25/RRF code, while remaining self-hostable and free.
+
+</details>
+
+<details>
+<summary><strong>Why Groq instead of OpenAI or Anthropic?</strong></summary>
+
+Groq runs LLMs on custom LPU (Language Processing Unit) hardware that delivers ~500 tokens/second — roughly 10x faster than OpenAI's API for equivalent models. This makes streaming feel genuinely real-time. Groq also offers llama-3.3-70b-versatile for free during development. For production, the same code works with any LangChain-compatible LLM by changing two lines.
+
+</details>
+
+<details>
+<summary><strong>Why async ingestion (202 Accepted) instead of synchronous upload?</strong></summary>
+
+Indexing a 20-page PDF involves:
+1. PyPDF parsing (~1s)
+2. Chunking into 50-200 pieces
+3. Embedding each chunk through a neural model (~5-20s)
+4. Writing to Qdrant
+
+Total: **15-45 seconds**. HTTP requests time out at ~30s in most browsers and proxies. Returning 202 immediately and letting the client poll every 1.5s gives the user a responsive experience while processing happens in the background.
+
+</details>
+
+<details>
+<summary><strong>Why two-stage retrieval (hybrid → rerank) instead of just returning top-5 directly?</strong></summary>
+
+**Problem:** Embedding similarity is good but imprecise. A chunk about "EC2 pricing documentation" might score lower than a chunk just mentioning "pricing" many times.
+
+**Solution:**
+1. **Stage 1 (Hybrid, top-20):** Cast a wide net — fast, catches semantically related AND keyword-matching chunks
+2. **Stage 2 (Rerank, top-5):** Cross-encoder reads the question AND each chunk together — much more accurate at "does this chunk actually answer the question?"
+
+**Result:** +1.5% correctness, +1.5% relevance vs hybrid-only (per ablation study).
+
+</details>
+
+<details>
+<summary><strong>Why JWT instead of session-based auth?</strong></summary>
+
+JWT tokens are **stateless** — the server can verify them by checking the cryptographic signature without any database lookup. This means:
+- Zero DB cost per authenticated request
+- Any backend replica can verify any token (horizontal scaling)
+- Tokens can embed tenant_id, user_id, and role — no extra DB query needed
+
+The downside is you can't revoke a JWT until it expires (24h). For enterprise use, you'd add a token blacklist in Redis.
+
+</details>
+
+<details>
+<summary><strong>Why multi-tenancy? I'm the only user.</strong></summary>
+
+Multi-tenancy is built into the data model from day one because:
+1. **Data isolation is much harder to add later** than to include from the start
+2. Every `Document` and Qdrant chunk is tagged with `tenant_id`, so queries are always filtered
+3. If you add a second user or share this with a team, their documents never mix with yours
+4. This is a portfolio project — showing proper SaaS isolation is a strong architectural signal
+
+</details>
+
+<details>
+<summary><strong>Why SSE (Server-Sent Events) instead of WebSockets for streaming?</strong></summary>
+
+WebSockets are bidirectional — good for chat UIs where the client sends messages back. SSE is unidirectional (server → client) but much simpler:
+- No connection upgrade handshake
+- Works through HTTP/2 multiplexing
+- Automatic reconnection in browsers
+- Standard `fetch()` API — works with JWT Bearer headers (which native `EventSource` doesn't support)
+
+For a Q&A interface where the client asks once and the server streams the answer, SSE is the correct tool.
+
+</details>
+
+<details>
+<summary><strong>Why Azure Container Apps instead of a VM?</strong></summary>
+
+Container Apps is serverless — it **scales to zero** when nobody is using DoCopilot. Since this is a dev/portfolio project with intermittent usage, paying for a running VM 24/7 would be wasteful. Container Apps charges only for actual request processing time.
+
+</details>
 
 ---
 

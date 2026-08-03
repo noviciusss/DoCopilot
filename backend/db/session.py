@@ -33,12 +33,12 @@ if "neon.tech" in DATABASE_URL or "azure" in DATABASE_URL or "ssl=" in DATABASE_
     connect_args["ssl"] = ssl_ctx
 
 engine = create_async_engine(
-
     DATABASE_URL,
     echo=False,
     pool_size=10,
     max_overflow=20,
     pool_pre_ping=True,
+    pool_recycle=300,
     connect_args=connect_args,
 )
 
@@ -61,5 +61,3 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
-        finally:
-            await session.close()
