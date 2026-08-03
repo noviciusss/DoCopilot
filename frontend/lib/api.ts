@@ -73,7 +73,10 @@ export async function apiGetDocuments(myDocs = true): Promise<DocumentLibraryIte
   const res = await fetch(`${API_BASE}/documents?my_docs=${myDocs}`, {
     headers: authHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to fetch document library");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail ?? `Failed to fetch documents (${res.status})`);
+  }
   return res.json();
 }
 
@@ -82,7 +85,10 @@ export async function apiDeleteDocument(docId: string): Promise<void> {
     method: "DELETE",
     headers: authHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to delete document");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail ?? `Failed to delete document (${res.status})`);
+  }
 }
 
 // ── Chat (SSE stream via fetch, supports Bearer header) ───────────────────────

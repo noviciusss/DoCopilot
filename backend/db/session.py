@@ -3,6 +3,7 @@ import logging
 import ssl
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.pool import NullPool
 from sqlalchemy.orm import DeclarativeBase
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,6 @@ if "sslmode=require" in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("sslmode=require", "ssl=require")
 
 connect_args = {}
-# If connecting to cloud PostgreSQL (Neon, Azure, AWS), configure SSL context
 # Disable prepared statement caching for cloud PostgreSQL compatibility (Neon/pgBouncer)
 connect_args["statement_cache_size"] = 0
 connect_args["prepared_statement_cache_size"] = 0
@@ -32,13 +32,12 @@ if "neon.tech" in DATABASE_URL or "azure" in DATABASE_URL or "ssl=" in DATABASE_
     ssl_ctx.verify_mode = ssl.CERT_NONE
     connect_args["ssl"] = ssl_ctx
 
+# Use NullPool: opens and closes a single connection per AsyncSession without keeping
+# idle connections attached to closed or changing asyncio event loops.
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,
-    pool_recycle=300,
+    poolclass=NullPool,
     connect_args=connect_args,
 )
 
