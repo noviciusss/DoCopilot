@@ -1,6 +1,6 @@
 # DoCopilot
 
-**Enterprise-grade RAG platform** — upload PDFs, TXT files, or paste text → asynchronous vector indexing with Qdrant hybrid search → JWT-authenticated chat with streamed SSE answers and source citations. Deployed to Azure Container Apps via GitHub Actions CI/CD.
+**Enterprise-grade RAG platform** — upload PDFs, TXT files, or paste text → asynchronous vector indexing with Qdrant Cloud hybrid search → JWT-authenticated chat with streamed SSE answers, source citations, and interactive document library. Deployed to Azure Container Apps via GitHub Actions CI/CD.
 
 ---
 
@@ -8,7 +8,7 @@
 
 ```mermaid
 flowchart TD
-    Browser["🌐 Browser\n(Next.js)"] -->|"HTTPS + JWT Bearer"| API
+    Browser["🌐 Browser (Next.js)\nModern Glassmorphism UI"] -->|"HTTPS + JWT Bearer"| API
 
     subgraph Backend ["FastAPI Backend — Azure Container Apps"]
         API["main.py\nFastAPI App"]
@@ -21,9 +21,9 @@ flowchart TD
         Guards["ragguardrails.py\nGuardrails"]
     end
 
-    subgraph Data ["Data Layer"]
-        PG[("PostgreSQL\nusers/tenants/\ndocuments/jobs")]
-        Qdrant[("Qdrant\nVector DB\ndense + sparse")]
+    subgraph Data ["Cloud Data Layer"]
+        PG[("Neon PostgreSQL\nusers/tenants/\ndocuments/jobs")]
+        Qdrant[("Qdrant Cloud Cluster\ndense + sparse BM25")]
     end
 
     subgraph External ["External APIs"]
@@ -690,6 +690,40 @@ az containerapp create `
 | `VERCEL_TOKEN` | From vercel.com (optional — frontend deploy) |
 | `VERCEL_ORG_ID` | From `.vercel/project.json` |
 | `VERCEL_PROJECT_ID` | From `.vercel/project.json` |
+
+---
+
+## Token & CI/CD Cost Optimization Guide
+
+### Why was token consumption high (100k+ tokens) during testing?
+1. **LLM Evaluation Benchmark (`pytest tests/test_rag_eval.py`)**:
+   - The evaluation suite runs 40 benchmark questions through Groq's `llama-3.3-70b` and an LLM-as-Judge to score correctness and relevance.
+   - Each question sends ~2,500 tokens of context + judge prompt, consuming ~100,000 tokens per evaluation run.
+2. **Dense Vector Embeddings & PDF Chunks**:
+   - Uploading large PDFs (e.g. 277 chunks) processes all chunks. (Note: Embeddings use `sentence-transformers` and `Qdrant/bm25` running **locally for FREE** on CPU without consuming LLM token quota).
+3. **CI Pipeline Runs on Every Push**:
+   - Triggering GitHub Actions CI on every commit executes test suites and Docker builds.
+
+### 💡 How to Optimize & Control Token Usage:
+
+1. **Separate Heavy LLM Eval from Everyday CI Push**:
+   - Keep GitHub Actions CI (`.github/workflows/ci.yml`) focused on fast unit/integration tests without running the 40-question LLM judge on every single commit.
+   - Run the 40-question evaluation suite manually or on a weekly schedule (`cron` trigger):
+     ```bash
+     pytest tests/test_rag_eval.py -v -s
+     ```
+
+2. **SHA-256 Checksum Idempotency Guard (Active)**:
+   - When uploading a document, DoCopilot calculates `SHA256(file_bytes)`. Re-uploading an existing file instantly returns the cached collection without re-embedding or invoking LLMs.
+
+3. **Adjust RAG Rerank Context Size (`FINAL_K`)**:
+   - In `.env`, tune `FINAL_K`:
+     ```env
+     FINAL_K=3   # Reduces prompt context sent to Groq from 5 chunks to 3 chunks (saves ~40% tokens per query)
+     ```
+
+4. **100% Free Local Embeddings**:
+   - Embeddings run on `all-MiniLM-L6-v2` and `Qdrant/bm25` locally. They cost $0.00 and consume 0 LLM API tokens.
 
 ---
 
