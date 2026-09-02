@@ -508,7 +508,7 @@ def get_document_data(document_id: Optional[str] = None) -> dict:
 
 @traceable(
     name="ask_question",
-    metadata={"version": "2.0", "model": "llama-3.3-70b-versatile", "vector_db": "qdrant", "hybrid": "qdrant_built_in"},
+    metadata={"version": "2.0", "model": "openai/gpt-oss-120b", "vector_db": "qdrant", "hybrid": "qdrant_built_in"},
     tags=["rag", "qa", "hybrid", "qdrant"]
 )
 def ask_question(question: str, *, document_id: Optional[str] = None, k: int = 5, tenant_id: str = "default") -> tuple[str, list[str]]:
