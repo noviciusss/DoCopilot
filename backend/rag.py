@@ -534,7 +534,7 @@ def ask_question(question: str, *, document_id: Optional[str] = None, k: int = 5
         raise ValueError("GROQ_API_KEY is not set.")
 
     from langchain_groq import ChatGroq
-    llm = ChatGroq(model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"), temperature=0, api_key=groq_api_key)
+    llm = ChatGroq(model=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"), temperature=0, api_key=groq_api_key)
     response = llm.invoke(final_prompt)
     answer = getattr(response, "text", None) or getattr(response, "content", str(response))
     sources = list(set(doc.metadata.get("source", "") for doc in retrieved_docs))
@@ -598,7 +598,7 @@ async def stream_answer(
         return
 
     from langchain_groq import ChatGroq
-    llm = ChatGroq(model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"), temperature=0, api_key=groq_api_key)
+    llm = ChatGroq(model=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"), temperature=0, api_key=groq_api_key)
     sources = list(set(doc.metadata.get("source", "") for doc in retrieved_docs))
 
     full_answer = ""
