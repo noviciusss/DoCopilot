@@ -44,6 +44,7 @@ az containerapp create \
     DATABASE_URL=secretref:database-url \
     JWT_SECRET_KEY=secretref:jwt-secret \
     GROQ_API_KEY=secretref:groq-api-key \
+    GROQ_MODEL=openai/gpt-oss-120b \
     COHERE_API_KEY=secretref:cohere-api-key \
     ALLOWED_ORIGINS=https://your-frontend.vercel.app
 
