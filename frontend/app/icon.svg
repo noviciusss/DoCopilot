@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Background squircle -->
+  <rect width="32" height="32" rx="8" fill="#0C0D11"/>
+  <rect x="0.5" y="0.5" width="31" height="31" rx="7.5" stroke="#262833" stroke-opacity="0.8"/>
+  
+  <!-- Back paper page -->
+  <rect x="7" y="6" width="14" height="18" rx="2" fill="#1C1E26" stroke="#323645" stroke-width="1" transform="rotate(-4 7 6)"/>
+  
+  <!-- Front paper page -->
+  <rect x="9" y="7" width="14" height="18" rx="2" fill="#13141B" stroke="#4F6BFF" stroke-width="1.2"/>
+  
+  <!-- Text lines -->
+  <line x1="12" y1="11.5" x2="19" y2="11.5" stroke="#E2E4EC" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="12" y1="14.5" x2="18" y2="14.5" stroke="#8A8F9E" stroke-width="1.1" stroke-linecap="round"/>
+  <line x1="12" y1="17.5" x2="16" y2="17.5" stroke="#8A8F9E" stroke-width="1.1" stroke-linecap="round"/>
+  
+  <!-- Intelligence Spark / Accent Dot -->
+  <circle cx="21.5" cy="8.5" r="2" fill="#E89D42"/>
+  <circle cx="21.5" cy="8.5" r="3" stroke="#E89D42" stroke-opacity="0.3" stroke-width="0.8"/>
+</svg>
