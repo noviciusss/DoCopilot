@@ -10,8 +10,19 @@ from backend.rag import index_get_pdf, ask_question
 
 
 
-# LLM for evaluation ///  We can use embeddings similarity too its faster and no extra calls but less accurate
-eval_llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
+import re
+
+def _get_eval_llm():
+    model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+    return ChatGroq(model=model, temperature=0)
+
+
+def _parse_score(content: str) -> float:
+    """Extract a float score between 0.0 and 1.0 from LLM response."""
+    match = re.search(r"\b(1\.0+|0(?:\.\d+)?|1)\b", content)
+    if match:
+        return min(1.0, max(0.0, float(match.group(1))))
+    return 0.5
 
 
 def llm_correctness(question: str, expected: str, predicted: str) -> float:
@@ -32,10 +43,10 @@ Score from 0.0 to 1.0:
 Return ONLY a number between 0.0 and 1.0, nothing else."""
 
     try:
-        response = eval_llm.invoke(prompt)
-        score = float(response.content.strip())
-        return min(1.0, max(0.0, score))
-    except:
+        llm = _get_eval_llm()
+        response = llm.invoke(prompt)
+        return _parse_score(response.content)
+    except Exception:
         return 0.5  # fallback
 
 
@@ -56,10 +67,10 @@ Score from 0.0 to 1.0:
 Return ONLY a number between 0.0 and 1.0, nothing else."""
 
     try:
-        response = eval_llm.invoke(prompt)
-        score = float(response.content.strip())
-        return min(1.0, max(0.0, score))
-    except:
+        llm = _get_eval_llm()
+        response = llm.invoke(prompt)
+        return _parse_score(response.content)
+    except Exception:
         return 0.5
 
 
@@ -80,10 +91,10 @@ Score from 0.0 to 1.0:
 Return ONLY a number between 0.0 and 1.0, nothing else."""
 
     try:
-        response = eval_llm.invoke(prompt)
-        score = float(response.content.strip())
-        return min(1.0, max(0.0, score))
-    except:
+        llm = _get_eval_llm()
+        response = llm.invoke(prompt)
+        return _parse_score(response.content)
+    except Exception:
         return 0.5
 
 
