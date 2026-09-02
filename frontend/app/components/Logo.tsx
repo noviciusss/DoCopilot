@@ -5,64 +5,50 @@ import React from "react";
 interface LogoProps {
   size?: "sm" | "md" | "lg";
   showText?: boolean;
-  showSubtitle?: boolean;
+  collapsed?: boolean;
 }
 
-export default function Logo({ size = "md", showText = true, showSubtitle = true }: LogoProps) {
-  const iconSizes = {
-    sm: "w-7 h-7 rounded-lg",
-    md: "w-9 h-9 rounded-xl",
-    lg: "w-12 h-12 rounded-2xl",
-  };
-
-  const svgSizes = {
-    sm: "w-4 h-4",
-    md: "w-5 h-5",
-    lg: "w-7 h-7",
-  };
-
-  const textSizes = {
-    sm: "text-sm",
-    md: "text-base",
-    lg: "text-2xl",
-  };
+export default function Logo({ size = "md", showText = true, collapsed = false }: LogoProps) {
+  const iconDim = { sm: 28, md: 32, lg: 40 }[size];
+  const textClass = { sm: "text-sm", md: "text-sm", lg: "text-lg" }[size];
 
   return (
-    <div className="flex items-center gap-3 select-none group">
-      {/* Brand Icon Badge */}
-      <div className={`relative flex items-center justify-center bg-gradient-to-tr from-violet-600 via-indigo-500 to-cyan-400 text-white shadow-lg shadow-indigo-500/20 ring-1 ring-white/20 transition-transform duration-300 group-hover:scale-105 ${iconSizes[size]}`}>
-        {/* Subtle background glow */}
-        <div className="absolute inset-0 rounded-inherit bg-gradient-to-tr from-violet-600 to-cyan-400 blur-md opacity-40 group-hover:opacity-75 transition-opacity" />
+    <div className="flex items-center gap-2.5 select-none" aria-label="Docopilot">
+      {/* Mark: stacked document shape */}
+      <svg
+        width={iconDim}
+        height={iconDim}
+        viewBox="0 0 32 32"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+        style={{ flexShrink: 0 }}
+      >
+        <rect width="32" height="32" rx="7" fill="var(--surface-2)" />
+        <rect x="1" y="1" width="30" height="30" rx="6" stroke="var(--border)" strokeWidth="1" />
+        {/* Back doc */}
+        <rect x="9" y="8" width="13" height="16" rx="1.5" fill="var(--border)" opacity="0.5" />
+        {/* Front doc */}
+        <rect x="7" y="6" width="13" height="16" rx="1.5" fill="var(--text-2)" opacity="0.9" />
+        {/* Fold corner */}
+        <path d="M17 6 L20 9 L17 9 Z" fill="var(--surface-2)" />
+        <path d="M17 6 L20 9 H17 Z" stroke="var(--border)" strokeWidth="0.75" />
+        {/* Lines */}
+        <rect x="9" y="12" width="7" height="1" rx="0.5" fill="var(--ink)" opacity="0.35" />
+        <rect x="9" y="14.5" width="9" height="1" rx="0.5" fill="var(--ink)" opacity="0.25" />
+        <rect x="9" y="17" width="5" height="1" rx="0.5" fill="var(--ink)" opacity="0.2" />
+        {/* Cobalt dot — active indicator */}
+        <circle cx="23" cy="23" r="4" fill="var(--cobalt)" />
+        <path d="M21.5 23 L22.5 24 L24.5 22" stroke="white" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
 
-        {/* Custom SVG Emblem: Overlapping Document Sheet + Copilot Star */}
-        <svg className={`relative z-10 ${svgSizes[size]}`} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Back document sheet */}
-          <path d="M7 3H15L19 7V17C19 18.1046 18.1046 19 17 19H7C5.89543 19 5 18.1046 5 17V5C5 3.89543 5.89543 3 7 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.6"/>
-          {/* Front document sheet fold */}
-          <path d="M14 3V8H19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.8"/>
-          {/* Glowing AI Sparkle emblem */}
-          <path d="M12 11C12 9.34315 13.3431 8 15 8C13.3431 8 12 6.65685 12 5C12 6.65685 10.6569 8 9 8C10.6569 8 12 9.34315 12 11Z" fill="currentColor"/>
-          <path d="M8 15C8 14.1716 8.67157 13.5 9.5 13.5C8.67157 13.5 8 12.8284 8 12C8 12.8284 7.32843 13.5 6.5 13.5C7.32843 13.5 8 14.1716 8 15Z" fill="currentColor" opacity="0.9"/>
-        </svg>
-      </div>
-
-      {/* Brand Typography */}
-      {showText && (
-        <div className="flex flex-col leading-none">
-          <div className="flex items-center gap-1.5">
-            <span className={`font-bold tracking-tight text-white ${textSizes[size]}`}>
-              Do<span className="bg-gradient-to-r from-violet-400 via-indigo-300 to-cyan-300 bg-clip-text text-transparent">Copilot</span>
-            </span>
-            <span className="px-1.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              RAG 2.0
-            </span>
-          </div>
-          {showSubtitle && (
-            <span className="text-[10px] text-zinc-400 font-medium tracking-wide mt-0.5">
-              Enterprise Document Intelligence
-            </span>
-          )}
-        </div>
+      {showText && !collapsed && (
+        <span
+          className={`font-semibold tracking-tight leading-none ${textClass}`}
+          style={{ color: "var(--text-1)" }}
+        >
+          Docopilot
+        </span>
       )}
     </div>
   );
