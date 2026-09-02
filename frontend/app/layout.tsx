@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -9,9 +9,17 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "DoCopilot — Chat with Your Documents",
+  title: "Docopilot — Document Research Workspace",
   description:
-    "Upload PDFs, TXT files, or paste text. Ask questions powered by hybrid RAG with Qdrant, streaming responses, and automatic source citations.",
+    "Upload PDFs and text documents, ask questions, and get grounded answers with retrieved source passages. Powered by hybrid RAG with Qdrant vector search.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

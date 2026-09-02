@@ -1,21 +1,194 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* ── Design Tokens ─────────────────────────────────────────────────────────── */
 :root {
-  --font-inter: "Inter", system-ui, sans-serif;
+  /* Surfaces */
+  --ink:          #121315;
+  --surface:      #1B1D20;
+  --surface-2:    #222529;
+  --border:       #303338;
+  --border-light: #3D4146;
+
+  /* Text */
+  --text-1:       #F4F1EA;
+  --text-2:       #A7AAA8;
+  --text-3:       #6B6E6C;
+
+  /* Paper (document / upload zone) */
+  --paper:        #F3F0E8;
+  --paper-border: #D9D4C9;
+  --ink-on-paper: #202124;
+  --paper-2:      #EAE7DE;
+
+  /* Accents — used sparingly */
+  --cobalt:       #4F6BFF;
+  --cobalt-hover: #607BFF;
+  --cobalt-dim:   rgba(79, 107, 255, 0.12);
+  --cobalt-ring:  rgba(79, 107, 255, 0.35);
+
+  --amber:        #E2A14A;
+  --amber-dim:    rgba(226, 161, 74, 0.12);
+
+  --green:        #7FAE81;
+  --green-dim:    rgba(127, 174, 129, 0.12);
+
+  --red:          #C0524A;
+  --red-dim:      rgba(192, 82, 74, 0.12);
+
+  /* Typography scale */
+  --font-sans:    "Inter", system-ui, -apple-system, sans-serif;
+  --text-xs:      0.6875rem;   /* 11px */
+  --text-sm:      0.75rem;     /* 12px */
+  --text-base:    0.8125rem;   /* 13px */
+  --text-md:      0.875rem;    /* 14px */
+  --text-lg:      1rem;        /* 16px */
+  --text-xl:      1.125rem;    /* 18px */
+
+  /* Sidebar */
+  --sidebar-w:    260px;
+  --sidebar-rail: 48px;
+
+  /* Chat panel */
+  --chat-w:       380px;
+
+  /* Transitions */
+  --ease-out:     cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:      cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  font-family: var(--font-inter), system-ui, sans-serif;
-  font-feature-settings: "cv11", "ss01";
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  font-feature-settings: "cv11", "ss01", "rlig" 1, "calt" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #09090b;
-  color: #fafafa;
+  background: var(--ink);
+  color: var(--text-1);
+  overflow: hidden;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+/* ── Selection ──────────────────────────────────────────────────────────────── */
+::selection {
+  background: var(--cobalt-dim);
+  color: var(--text-1);
+}
+
+/* ── Focus Rings ────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--cobalt);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #52525b; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* ── Typography utilities ───────────────────────────────────────────────────── */
+.text-label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.text-meta {
+  font-size: var(--text-xs);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 40;
+  overflow: hidden;
+}
+
+/* ── Chat panel ─────────────────────────────────────────────────────────────── */
+.chat-panel {
+  width: var(--chat-w);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Workspace ──────────────────────────────────────────────────────────────── */
+.workspace {
+  flex: 1;
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--ink);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Paper surface ──────────────────────────────────────────────────────────── */
+.paper-surface {
+  background: var(--paper);
+  border: 1px solid var(--paper-border);
+  color: var(--ink-on-paper);
+}
+
+/* ── Prose overrides ────────────────────────────────────────────────────────── */
+.prose-doc {
+  --tw-prose-body: var(--text-1);
+  --tw-prose-headings: var(--text-1);
+  --tw-prose-lead: var(--text-2);
+  --tw-prose-links: var(--cobalt);
+  --tw-prose-bold: var(--text-1);
+  --tw-prose-counters: var(--text-2);
+  --tw-prose-bullets: var(--border-light);
+  --tw-prose-hr: var(--border);
+  --tw-prose-quotes: var(--text-1);
+  --tw-prose-quote-borders: var(--border);
+  --tw-prose-captions: var(--text-2);
+  --tw-prose-code: var(--text-1);
+  --tw-prose-pre-code: var(--text-1);
+  --tw-prose-pre-bg: var(--surface-2);
+  --tw-prose-th-borders: var(--border);
+  --tw-prose-td-borders: var(--border);
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────────── */
+/* JS animations are handled via MotionConfig reducedMotion="user" */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Radix Dialog / Overlay ─────────────────────────────────────────────────── */
+[data-radix-popper-content-wrapper] {
+  z-index: 60 !important;
+}
