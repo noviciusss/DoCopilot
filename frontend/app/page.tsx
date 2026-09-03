@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MotionConfig, motion } from "motion/react";
+import { MotionConfig } from "motion/react";
 
 import { useAuth } from "../lib/hooks/useAuth";
 import { useUpload, IngestionStatus } from "../lib/hooks/useUpload";
@@ -12,244 +12,18 @@ import { apiStreamChat } from "../lib/api";
 import AppShell from "./components/layout/app-shell";
 import AppSidebar from "./components/layout/app-sidebar";
 import WorkspaceHeader from "./components/layout/workspace-header";
-import UploadDropzone from "./components/documents/upload-dropzone";
-import UploadStatus from "./components/documents/upload-status";
 import AssistantPanel from "./components/chat/assistant-panel";
 import CommandPalette from "./components/ui/command-palette";
+import DocumentOverview from "./components/documents/document-overview";
+import EmptyWorkspace from "./components/documents/empty-workspace";
 
-import {
-  FileText,
-  Info,
-  AlertTriangle,
-  Loader2,
-  CheckCircle2,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
 type UploadType = "pdf" | "txt" | "text";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Document Overview center pane
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface DocOverviewProps {
-  doc: DocumentLibraryItem;
-  effectiveStatus: IngestionStatus;
-  onSendQuestion: (q: string) => void;
-}
-
-const SHORTCUT_QUESTIONS = [
-  "Summarize the main points of this document",
-  "What are the key conclusions or findings?",
-  "What topics or concepts are defined here?",
-];
-
-function DocumentOverview({ doc, effectiveStatus, onSendQuestion }: DocOverviewProps) {
-  function formatBytes(b: number): string {
-    if (b < 1024) return `${b} B`;
-    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
-    return `${(b / 1024 / 1024).toFixed(1)} MB`;
-  }
-
-  const isReady = effectiveStatus === "succeeded";
-  const isProcessing = ["uploading", "queued", "running"].includes(effectiveStatus);
-  const isFailed = effectiveStatus === "failed";
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col gap-4 max-w-xl mx-auto w-full px-4 py-6"
-    >
-      {/* Document identity card */}
-      <div
-        className="rounded-xl p-5 space-y-3"
-        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-      >
-        <div className="flex items-start gap-3">
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
-          >
-            <FileText size={18} style={{ color: "var(--text-2)" }} aria-hidden="true" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2
-              className="text-sm font-semibold leading-snug break-words"
-              style={{ color: "var(--text-1)", wordBreak: "break-word" }}
-            >
-              {doc.filename}
-            </h2>
-            <p className="text-meta mt-0.5">
-              {formatBytes(doc.file_size_bytes)} · {doc.mime_type} ·{" "}
-              {new Date(doc.created_at).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </p>
-          </div>
-        </div>
-
-        {/* Status */}
-        <div
-          className="flex items-center gap-2 p-2.5 rounded-md"
-          style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
-          role="status"
-          aria-live="polite"
-        >
-          {isReady && (
-            <>
-              <CheckCircle2 size={13} style={{ color: "var(--green)", flexShrink: 0 }} aria-hidden="true" />
-              <p className="text-xs" style={{ color: "var(--text-2)" }}>
-                <span style={{ color: "var(--green)", fontWeight: 500 }}>Ready to query.</span>{" "}
-                Ask a question in the assistant panel on the right.
-              </p>
-            </>
-          )}
-          {isProcessing && (
-            <>
-              <Loader2 size={13} className="animate-spin flex-shrink-0" style={{ color: "var(--cobalt)" }} aria-hidden="true" />
-              <p className="text-xs" style={{ color: "var(--text-2)" }}>
-                Document is being processed and indexed — this may take a moment.
-              </p>
-            </>
-          )}
-          {isFailed && (
-            <>
-              <AlertTriangle size={13} style={{ color: "var(--red)", flexShrink: 0 }} aria-hidden="true" />
-              <p className="text-xs" style={{ color: "var(--red)" }}>
-                Indexing failed. Try re-uploading this document.
-              </p>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* How answers work */}
-      <div
-        className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg"
-        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-      >
-        <Info size={13} style={{ color: "var(--text-3)", flexShrink: 0, marginTop: 1 }} aria-hidden="true" />
-        <p className="text-xs leading-relaxed" style={{ color: "var(--text-2)" }}>
-          Answers are generated by retrieving the most relevant passages from this document
-          and synthesizing them with an LLM. The{" "}
-          <span style={{ color: "var(--amber)", fontWeight: 500 }}>source snippets</span>{" "}
-          shown with each answer are the actual retrieved context used to produce the response.
-        </p>
-      </div>
-
-      {/* Shortcut questions — only if indexed */}
-      {isReady && (
-        <div className="space-y-2">
-          <p className="text-label" style={{ color: "var(--text-3)" }}>Quick questions</p>
-          <div className="space-y-1.5">
-            {SHORTCUT_QUESTIONS.map((q) => (
-              <button
-                key={q}
-                type="button"
-                onClick={() => onSendQuestion(q)}
-                className="w-full text-left text-xs rounded-md px-3 py-2.5 leading-snug transition-colors"
-                style={{
-                  background: "var(--surface)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-2)",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = "var(--cobalt)";
-                  e.currentTarget.style.color = "var(--text-1)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "var(--border)";
-                  e.currentTarget.style.color = "var(--text-2)";
-                }}
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Upload workspace (empty / no active doc)
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface UploadWorkspaceProps {
-  uploadType: UploadType;
-  setUploadType: (t: UploadType) => void;
-  file: File | null;
-  setFile: (f: File | null) => void;
-  plainText: string;
-  setPlainText: (t: string) => void;
-  ingestionStatus: IngestionStatus;
-  uploadError: string | null;
-  onSubmit: (e: FormEvent<HTMLFormElement>) => void;
-}
-
-function UploadWorkspace(props: UploadWorkspaceProps) {
-  return (
-    <div className="flex flex-col items-center justify-start px-4 py-8 max-w-lg mx-auto w-full gap-5">
-      {/* Minimal stacked-paper illustration — CSS only */}
-      <div className="relative w-14 h-16 mb-2 select-none" aria-hidden="true">
-        <div
-          className="absolute bottom-0 left-1 w-12 h-14 rounded-lg"
-          style={{ background: "var(--paper-border)", transform: "rotate(-4deg)" }}
-        />
-        <div
-          className="absolute bottom-0 left-0.5 w-12 h-14 rounded-lg"
-          style={{ background: "var(--paper-2)", transform: "rotate(-1.5deg)" }}
-        />
-        <div
-          className="absolute bottom-0 left-0 w-12 h-14 rounded-lg"
-          style={{ background: "var(--paper)", border: "1px solid var(--paper-border)" }}
-        />
-        {/* Fold corner */}
-        <div
-          className="absolute top-0 right-0 w-0 h-0"
-          style={{
-            borderLeft: "10px solid transparent",
-            borderBottom: "10px solid transparent",
-            borderRight: "10px solid var(--paper-border)",
-            borderTop: "10px solid var(--paper-border)",
-            borderRadius: "0 2px 0 0",
-          }}
-        />
-        {/* Lines */}
-        <div className="absolute top-5 left-2 right-2 space-y-1.5">
-          <div className="h-0.5 rounded-full" style={{ background: "var(--paper-border)" }} />
-          <div className="h-0.5 rounded-full w-3/4" style={{ background: "var(--paper-border)" }} />
-          <div className="h-0.5 rounded-full w-2/3" style={{ background: "var(--paper-border)" }} />
-        </div>
-      </div>
-
-      <div className="text-center space-y-0.5">
-        <h1 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
-          Upload a document
-        </h1>
-        <p className="text-xs" style={{ color: "var(--text-2)" }}>
-          PDF, TXT, or paste text · Max 20 MB · Answers are grounded in retrieved passages
-        </p>
-      </div>
-
-      <div
-        className="w-full rounded-xl p-5 space-y-4"
-        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-      >
-        <UploadDropzone {...props} />
-        <UploadStatus status={props.ingestionStatus} error={props.uploadError} />
-      </div>
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root page component
@@ -494,10 +268,13 @@ export default function Home() {
             <DocumentOverview
               doc={activeLibDoc}
               effectiveStatus={effectiveStatus}
+              isAsking={isAsking}
+              hasAnswer={Boolean(streamingAnswer)}
+              hasSources={sources.length > 0}
               onSendQuestion={handleSendQuestion}
             />
           ) : (
-            <UploadWorkspace
+            <EmptyWorkspace
               uploadType={uploadType}
               setUploadType={setUploadType}
               file={file}
@@ -507,6 +284,8 @@ export default function Home() {
               ingestionStatus={ingestionStatus}
               uploadError={uploadError}
               onSubmit={handleUpload}
+              recentDocuments={documents}
+              onSelectDocument={handleSelectFromLibrary}
             />
           )}
         </div>

@@ -1,25 +1,18 @@
 "use client";
 
-import { useReducedMotion, motion, MotionConfig, useAnimate } from "motion/react";
-import { useEffect } from "react";
+import { useReducedMotion, motion, MotionConfig } from "motion/react";
 
 // ─── Fragment definitions (all coordinates in viewBox 0 0 1000 660) ──────────
-// The auth card occupies roughly cx 500, cy 330, ~380px wide, ~540px tall
-// Fragments must be placed outside this area. viewBox is 1000×660.
-// Index ring sits at exactly (500, 330) — behind the auth card in z-order.
-
 interface Fragment {
   id: string;
   label: string;
   ext: string;
-  // center of fragment in viewBox coords
   cx: number;
   cy: number;
   w: number;
   h: number;
   rot: number;
-  delay: number; // seconds
-  // tablet: show on ≥768px — controlled via CSS class outside SVG
+  delay: number;
   tablet?: boolean;
 }
 
@@ -36,67 +29,19 @@ const INDEX_CX = 500;
 const INDEX_CY = 330;
 const INDEX_R  = 32;
 
-// ─── Bezier path from fragment edge to index ring edge ────────────────────────
 function buildPath(f: Fragment): string {
   const dx = INDEX_CX - f.cx;
   const dy = INDEX_CY - f.cy;
   const len = Math.sqrt(dx * dx + dy * dy);
   const nx = dx / len;
   const ny = dy / len;
-  // Start from fragment edge (not center)
   const startX = f.cx + nx * (f.w / 2 + 6);
   const startY = f.cy + ny * (f.h / 2 + 6);
-  // End at ring edge
   const endX = INDEX_CX - nx * (INDEX_R + 4);
   const endY = INDEX_CY - ny * (INDEX_R + 4);
-  // Slight arc — control point offset perpendicular to line
   const cpX = (startX + endX) / 2 - ny * 40;
   const cpY = (startY + endY) / 2 + nx * 40;
   return `M ${startX} ${startY} Q ${cpX} ${cpY} ${endX} ${endY}`;
-}
-
-// ─── Amber marker that travels along a path once every ~10s ──────────────────
-function AmberMarker({ reduced }: { reduced: boolean }) {
-  const [scope, animate] = useAnimate();
-  const markerPath = buildPath(FRAGMENTS[0]); // RESEARCH.PDF path
-
-  useEffect(() => {
-    if (reduced) return;
-    let mounted = true;
-
-    async function runCycle() {
-      while (mounted) {
-        // Wait 8s before first travel, then repeat every 10s
-        await new Promise((r) => setTimeout(r, 8000));
-        if (!mounted) break;
-        await animate(
-          scope.current,
-          { offsetDistance: ["0%", "100%"], opacity: [0, 0.9, 0.9, 0] },
-          { duration: 1.6, ease: [0.4, 0, 0.6, 1] }
-        );
-        if (!mounted) break;
-        await new Promise((r) => setTimeout(r, 10000));
-      }
-    }
-
-    runCycle();
-    return () => { mounted = false; };
-  }, [reduced, animate, scope, markerPath]);
-
-  if (reduced) return null;
-
-  return (
-    <circle
-      ref={scope}
-      r={4}
-      fill="var(--amber)"
-      opacity={0}
-      style={{
-        offsetPath: `path("${markerPath}")`,
-        offsetDistance: "0%",
-      }}
-    />
-  );
 }
 
 // ─── Single fragment (SVG group) ──────────────────────────────────────────────
