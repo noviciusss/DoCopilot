@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Components } from "react-markdown";
-import type { AnchorHTMLAttributes } from "react";
+import { motion } from "motion/react";
+import type { AnchorHTMLAttributes, ReactNode } from "react";
 
 // Safe link renderer — all external links get rel + target
 const SafeLink = ({
@@ -22,9 +23,23 @@ const SafeLink = ({
   </a>
 );
 
-// Markdown component overrides — typed correctly
+// Paragraph with one-shot fade-in — fires once per element mount during streaming
+// No typewriter, no infinite animation.
+const FadeInParagraph = ({ children }: { children?: ReactNode }) => (
+  <motion.p
+    initial={{ opacity: 0, y: 4 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+    style={{ margin: "0.4em 0" }}
+  >
+    {children}
+  </motion.p>
+);
+
+// Markdown component overrides
 const components: Components = {
   a: SafeLink as Components["a"],
+  p: FadeInParagraph as Components["p"],
 };
 
 interface Props {

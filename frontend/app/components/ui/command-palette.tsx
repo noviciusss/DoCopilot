@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { motion, AnimatePresence } from "motion/react";
 import { Search, FileText, X } from "lucide-react";
 import { DocumentLibraryItem } from "../../../lib/hooks/useDocuments";
 
@@ -106,26 +107,33 @@ export default function CommandPalette({
                 </p>
               </div>
             ) : (
-              filtered.map((doc) => (
-                <button
-                  key={doc.id}
-                  role="option"
-                  aria-selected="false"
-                  onClick={() => handleSelect(doc)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
-                  style={{ color: "var(--text-1)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--cobalt-dim)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                  onFocus={(e) => (e.currentTarget.style.background = "var(--cobalt-dim)")}
-                  onBlur={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <FileText size={14} style={{ color: "var(--text-3)", flexShrink: 0 }} aria-hidden="true" />
-                  <span className="flex-1 min-w-0 text-xs truncate">{doc.filename}</span>
-                  <span className="text-meta flex-shrink-0">
-                    {(doc.file_size_bytes / 1024).toFixed(0)} KB
-                  </span>
-                </button>
-              ))
+              <AnimatePresence initial={false}>
+                {filtered.map((doc) => (
+                  <motion.button
+                    key={doc.id}
+                    layout="position"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    role="option"
+                    aria-selected="false"
+                    onClick={() => handleSelect(doc)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
+                    style={{ color: "var(--text-1)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--cobalt-dim)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    onFocus={(e) => (e.currentTarget.style.background = "var(--cobalt-dim)")}
+                    onBlur={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <FileText size={14} style={{ color: "var(--text-3)", flexShrink: 0 }} aria-hidden="true" />
+                    <span className="flex-1 min-w-0 text-xs truncate">{doc.filename}</span>
+                    <span className="text-meta flex-shrink-0">
+                      {(doc.file_size_bytes / 1024).toFixed(0)} KB
+                    </span>
+                  </motion.button>
+                ))}
+              </AnimatePresence>
             )}
           </div>
 

@@ -255,13 +255,23 @@ function SidebarInner({
                 }} />
               </button>
             ) : (
-              <DocumentListItem
-                key={doc.id}
-                doc={doc}
-                isActive={doc.id === activeDocumentId}
-                onSelect={(d) => { onSelect(d); onClose?.(); }}
-                onDelete={onDelete}
-              />
+              /* Full list item with Motion layoutId selection indicator */
+              <div key={doc.id} className="relative">
+                {doc.id === activeDocumentId && (
+                  <motion.div
+                    layoutId="active-doc-indicator"
+                    className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full"
+                    style={{ background: "var(--cobalt)", zIndex: 1 }}
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                  />
+                )}
+                <DocumentListItem
+                  doc={doc}
+                  isActive={doc.id === activeDocumentId}
+                  onSelect={(d) => { onSelect(d); onClose?.(); }}
+                  onDelete={onDelete}
+                />
+              </div>
             )
           )}
         </div>

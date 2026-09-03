@@ -5,7 +5,7 @@ import { motion, MotionConfig } from "motion/react";
 import { Copy, Check, RotateCcw } from "lucide-react";
 import ChatMessage from "./chat-message";
 import ChatComposer from "./chat-composer";
-import SourceCard from "./source-card";
+import SourceSnippets from "./source-snippets";
 import SuggestedPrompts from "./suggested-prompts";
 
 interface Props {
@@ -168,7 +168,7 @@ export default function AssistantPanel({
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.2, delay: 0.1 }}
                   >
-                    <SourceCard sources={sources} />
+                    <SourceSnippets sources={sources} />
                   </motion.div>
                 )}
               </motion.div>

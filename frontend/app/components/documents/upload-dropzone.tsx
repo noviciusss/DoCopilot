@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, DragEvent, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { UploadCloud, FileText, X, FileType2 } from "lucide-react";
 import { IngestionStatus } from "../../../lib/hooks/useUpload";
 
@@ -140,11 +141,37 @@ export default function UploadDropzone({
               </div>
             ) : (
               <>
-                <UploadCloud
-                  size={28}
-                  style={{ color: dragging ? "var(--cobalt)" : "var(--text-3)", marginBottom: 8 }}
-                  aria-hidden="true"
-                />
+                {/* Paper stack — fans out on drag-over, collapses otherwise */}
+                <div className="relative w-10 h-12 mb-3" aria-hidden="true">
+                  {/* Back layers */}
+                  <motion.div
+                    className="absolute inset-0 rounded"
+                    style={{ background: "var(--border)", originX: 0.5, originY: 1 }}
+                    animate={dragging
+                      ? { rotate: -10, x: -6, y: -4, opacity: 0.6 }
+                      : { rotate: 0,   x: 0,  y: 0,  opacity: 0   }}
+                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                  />
+                  <motion.div
+                    className="absolute inset-0 rounded"
+                    style={{ background: "var(--border-light)", originX: 0.5, originY: 1 }}
+                    animate={dragging
+                      ? { rotate: -5,  x: -3, y: -2, opacity: 0.8 }
+                      : { rotate: 0,   x: 0,  y: 0,  opacity: 0   }}
+                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1], delay: 0.03 }}
+                  />
+                  {/* Front page — always visible */}
+                  <div
+                    className="absolute inset-0 rounded flex items-center justify-center"
+                    style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
+                  >
+                    <UploadCloud
+                      size={18}
+                      style={{ color: dragging ? "var(--cobalt)" : "var(--text-3)" }}
+                      aria-hidden="true"
+                    />
+                  </div>
+                </div>
                 <p className="text-xs font-medium" style={{ color: "var(--text-1)" }}>
                   Drop {uploadType === "pdf" ? "PDF" : "TXT"} here or click to browse
                 </p>

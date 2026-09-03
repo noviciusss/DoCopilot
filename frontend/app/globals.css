@@ -76,7 +76,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: var(--ink);
   color: var(--text-1);
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* ── Selection ──────────────────────────────────────────────────────────────── */
