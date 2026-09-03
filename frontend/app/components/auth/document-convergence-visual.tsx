@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useReducedMotion, motion, MotionConfig, useAnimate } from "motion/react";
 import { useEffect } from "react";
@@ -173,17 +173,35 @@ export default function DocumentConvergenceVisual() {
           xmlns="http://www.w3.org/2000/svg"
           className="hidden md:block"
         >
+          {/* Radial fade mask: composition is fully transparent at center (behind card),
+              fades to full opacity toward the outer edges where fragments live.
+              This means no text or path lines bleed through behind the card. */}
+          <defs>
+            <radialGradient id="center-fade" cx="50%" cy="50%" r="50%">
+              <stop offset="0%"   stopColor="black" stopOpacity="1" />
+              <stop offset="28%"  stopColor="black" stopOpacity="1" />
+              <stop offset="52%"  stopColor="black" stopOpacity="0.35" />
+              <stop offset="70%"  stopColor="black" stopOpacity="0" />
+            </radialGradient>
+            <mask id="fade-mask">
+              {/* White = show, black = hide. Invert: use rect minus center circle */}
+              <rect width="1000" height="660" fill="white" />
+              <rect width="1000" height="660" fill="url(#center-fade)" />
+            </mask>
+          </defs>
+
+          {/* All composition elements masked — center fades to transparent */}
+          <g mask="url(#fade-mask)">
           {/* Connector paths first (rendered behind fragments & ring) */}
           {FRAGMENTS.map((f) => (
             <motion.path
               key={`path-${f.id}`}
               d={buildPath(f)}
               stroke="var(--cobalt)"
-              strokeWidth={0.6}
-              strokeOpacity={0.28}
+              strokeWidth={0.75}
+              strokeOpacity={0.38}
               fill="none"
               strokeLinecap="round"
-              // Tablet: only draw paths for tablet-visible fragments
               className={!f.tablet ? "hidden lg:block" : undefined}
               initial={reduced ? false : { pathLength: 0, opacity: 0 }}
               animate={{ pathLength: 1, opacity: 1 }}
@@ -197,6 +215,7 @@ export default function DocumentConvergenceVisual() {
               }
             />
           ))}
+          </g>
 
           {/* Index ring — behind the auth card in visual z-order */}
           <motion.g
@@ -227,10 +246,7 @@ export default function DocumentConvergenceVisual() {
             <rect x={INDEX_CX-5} y={INDEX_CY+2} width={10} height={1.5} rx={0.75} fill="var(--cobalt)" opacity={0.3}  />
           </motion.g>
 
-          {/* Amber retrieval marker (travels once every ~10s) */}
-          <AmberMarker reduced={reduced} />
-
-          {/* Fragment cards */}
+          {/* Fragment cards — rendered outside mask so they appear at full opacity */}
           {FRAGMENTS.map((f) => (
             <g
               key={f.id}
@@ -240,29 +256,7 @@ export default function DocumentConvergenceVisual() {
             </g>
           ))}
 
-          {/* Micro-labels near index ring */}
-          <motion.g
-            initial={reduced ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={reduced ? { duration: 0 } : { duration: 0.35, delay: 0.7 }}
-            className="hidden lg:block"
-          >
-            <text
-              x={INDEX_CX} y={INDEX_CY - INDEX_R - 16}
-              textAnchor="middle" fontFamily="var(--font-sans)"
-              fontSize={6.5} fontWeight={500} letterSpacing="0.09em" fill="var(--text-3)"
-            >INDEXED</text>
-            <text
-              x={INDEX_CX + INDEX_R + 14} y={INDEX_CY + 3}
-              textAnchor="start" fontFamily="var(--font-sans)"
-              fontSize={6.5} fontWeight={500} letterSpacing="0.09em" fill="var(--text-3)"
-            >RETRIEVED CONTEXT</text>
-            <text
-              x={INDEX_CX - INDEX_R - 14} y={INDEX_CY + 22}
-              textAnchor="end" fontFamily="var(--font-sans)"
-              fontSize={6.5} fontWeight={500} letterSpacing="0.09em" fill="var(--text-3)"
-            >READY TO QUERY</text>
-          </motion.g>
+          {/* No center labels — they were positioned behind the auth card */}
         </svg>
       </div>
     </MotionConfig>

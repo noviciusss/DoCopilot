@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -54,13 +54,23 @@ export default function LoginPage() {
   };
 
   return (
-    // Full-screen container. The convergence visual is a fixed sibling behind this.
     <div
       className="relative min-h-screen flex flex-col items-center justify-center px-4 py-10"
-      style={{ background: "var(--ink)", color: "var(--text-1)", zIndex: 1 }}
+      style={{ color: "var(--text-1)", zIndex: 1 }}
     >
       {/* Decorative convergence visual — fixed, behind this content */}
       <DocumentConvergenceVisual />
+
+      {/* Subtle center-focus vignette: edges darker, center lighter.
+          Adds atmospheric depth without any color/glow. pointer-events:none. */}
+      <div
+        aria-hidden="true"
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          zIndex: 1,
+          background: "radial-gradient(ellipse 60% 55% at 50% 50%, transparent 0%, rgba(18,19,21,0.55) 100%)",
+        }}
+      />
 
       {/* Mobile-only index mark */}
       <MobileIndexMark />
@@ -90,8 +100,7 @@ export default function LoginPage() {
           style={{
             background: "var(--surface)",
             border: "1px solid var(--border)",
-            // Subtle shadow so card reads above the dim background SVG
-            boxShadow: "0 4px 32px rgba(0,0,0,0.45)",
+            boxShadow: "0 8px 48px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.04) inset",
           }}
         >
           <h1 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
